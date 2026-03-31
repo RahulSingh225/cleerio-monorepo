@@ -1,0 +1,534 @@
+import {
+  pgTable,
+  uuid,
+  varchar,
+  jsonb,
+  boolean,
+  integer,
+  numeric,
+  text,
+  index,
+  uniqueIndex,
+  timestamp,
+  date,
+  AnyPgColumn,
+} from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+
+// ─── TENANTS ─────────────────────────────────────────────────
+
+export const tenants = pgTable(
+  'tenants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 255 }).notNull(),
+    code: varchar('code', { length: 50 }).notNull().unique(), // short slug e.g. HDFC_NBFC
+    status: varchar('status', { length: 20 }).notNull().default('active'), // active | suspended | onboarding
+    settings: jsonb('settings').default({}), // whitelabel config, timezone, locale
+    createdBy: uuid('created_by'), // -> platform_users.id
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    codeIdx: uniqueIndex('tenants_code_idx').on(t.code),
+  })
+);
+
+// ─── PLATFORM USERS ──────────────────────────────────────────
+
+export const platformUsers = pgTable('platform_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 255 }),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  role: varchar('role', { length: 30 }).notNull().default('platform_admin'), // platform_admin | platform_ops
+  status: varchar('status', { length: 20 }).notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// ─── TENANT USERS ────────────────────────────────────────────
+
+export const tenantUsers = pgTable(
+  'tenant_users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    email: varchar('email', { length: 255 }).notNull(),
+    name: varchar('name', { length: 255 }),
+    passwordHash: varchar('password_hash', { length: 255 }),
+    role: varchar('role', { length: 30 }).notNull(), // tenant_admin | analyst | ops | viewer
+    status: varchar('status', { length: 20 }).notNull().default('active'), // active | inactive | invited
+    invitedBy: uuid('invited_by').references((): AnyPgColumn => tenantUsers.id),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantEmailIdx: uniqueIndex('tenant_users_tenant_email_idx').on(t.tenantId, t.email),
+    tenantIdIdx: index('tenant_users_tenant_id_idx').on(t.tenantId),
+  })
+);
+
+// ─── FIELD REGISTRY ──────────────────────────────────────────
+
+export const tenantFieldRegistry = pgTable(
+  'tenant_field_registry',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    fieldKey: varchar('field_key', { length: 20 }).notNull(), // field1, field2
+    fieldIndex: integer('field_index').notNull(),
+    headerName: varchar('header_name', { length: 100 }).notNull(),
+    displayLabel: varchar('display_label', { length: 100 }).notNull(),
+    dataType: varchar('data_type', { length: 20 }).notNull().default('string'), // string | number | date | boolean
+    isCore: boolean('is_core').default(false),
+    isPii: boolean('is_pii').default(false),
+    sampleValue: varchar('sample_value', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantFieldKeyIdx: uniqueIndex('tenant_field_registry_tenant_field_key_idx').on(t.tenantId, t.fieldKey),
+    tenantHeaderIdx: uniqueIndex('tenant_field_registry_tenant_header_idx').on(t.tenantId, t.headerName),
+    tenantIdIdx: index('tenant_field_registry_tenant_id_idx').on(t.tenantId),
+  })
+);
+
+// ─── PORTFOLIO MANAGEMENT ────────────────────────────────────
+
+export const portfolios = pgTable(
+  'portfolios',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    allocationMonth: varchar('allocation_month', { length: 10 }).notNull(), // e.g. 2026_03
+    sourceType: varchar('source_type', { length: 20 }).notNull(), // csv | xlsx | api
+    status: varchar('status', { length: 20 }).notNull().default('pending'), // pending | processing | completed | failed
+    fileUrl: text('file_url'),
+    totalRecords: integer('total_records').default(0),
+    processedRecords: integer('processed_records').default(0),
+    failedRecords: integer('failed_records').default(0),
+    uploadedBy: uuid('uploaded_by').references(() => tenantUsers.id),
+    errorLog: jsonb('error_log').default([]), // array of row-level parse errors
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('portfolios_tenant_id_idx').on(t.tenantId),
+    tenantAllocMonthIdx: index('portfolios_tenant_alloc_month_idx').on(t.tenantId, t.allocationMonth),
+    statusIdx: index('portfolios_status_idx').on(t.status),
+  })
+);
+
+// ── DPD BUCKET CONFIGURATION ────────────────────────────────
+
+export const dpdBucketConfigs = pgTable(
+    'dpd_bucket_configs',
+    {
+      id: uuid('id').primaryKey().defaultRandom(),
+      tenantId: uuid('tenant_id')
+        .notNull()
+        .references(() => tenants.id),
+      bucketName: varchar('bucket_name', { length: 50 }).notNull(),
+      dpdMin: integer('dpd_min').notNull(),
+      dpdMax: integer('dpd_max'),
+      displayLabel: varchar('display_label', { length: 100 }),
+      priority: integer('priority').default(0),
+      isActive: boolean('is_active').default(true),
+      createdBy: uuid('created_by').references(() => tenantUsers.id),
+      createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+      updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    },
+    (t) => ({
+      tenantIdIdx: index('dpd_bucket_configs_tenant_id_idx').on(t.tenantId),
+      tenantBucketNameIdx: uniqueIndex('dpd_bucket_configs_tenant_bucket_name_idx').on(t.tenantId, t.bucketName),
+    })
+);
+
+export const portfolioRecords = pgTable(
+  'portfolio_records',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    portfolioId: uuid('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+
+    // Core identity & financial fields
+    userId: varchar('user_id', { length: 50 }).notNull(), // borrower ID from NBFC
+    mobile: varchar('mobile', { length: 15 }).notNull(),
+    name: varchar('name', { length: 255 }),
+    product: varchar('product', { length: 100 }),
+    employerId: varchar('employer_id', { length: 50 }),
+    currentDpd: integer('current_dpd').default(0),
+    dpdBucket: varchar('dpd_bucket', { length: 50 }), // resolved bucket name from configs
+    overdue: numeric('overdue', { precision: 14, scale: 2 }).default('0'),
+    outstanding: numeric('outstanding', { precision: 14, scale: 2 }).default('0'),
+
+    // All upload columns stored as fieldN keys
+    dynamicFields: jsonb('dynamic_fields').default({}),
+
+    // Record state
+    isOptedOut: boolean('is_opted_out').default(false), // DNC flag
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('portfolio_records_tenant_id_idx').on(t.tenantId),
+    tenantUserIdIdx: index('portfolio_records_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantDpdIdx: index('portfolio_records_tenant_dpd_idx').on(t.tenantId, t.currentDpd),
+    tenantBucketIdx: index('portfolio_records_tenant_bucket_idx').on(t.tenantId, t.dpdBucket),
+    mobileIdx: index('portfolio_records_mobile_idx').on(t.mobile),
+    portfolioIdIdx: index('portfolio_records_portfolio_id_idx').on(t.portfolioId),
+    dynamicFieldsGinIdx: index('portfolio_records_dynamic_fields_gin_idx').using('gin', t.dynamicFields),
+  })
+);
+
+export const repaymentSyncs = pgTable(
+  'repayment_syncs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    sourceType: varchar('source_type', { length: 20 }).notNull(), // csv | xlsx | api
+    fileUrl: text('file_url'),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    recordsUpdated: integer('records_updated').default(0),
+    uploadedBy: uuid('uploaded_by').references(() => tenantUsers.id),
+    syncDate: date('sync_date').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantDateIdx: index('repayment_syncs_tenant_date_idx').on(t.tenantId, t.syncDate),
+  })
+);
+
+
+// ─── CHANNEL CONFIGURATION ───────────────────────────────────
+
+export const channelConfigs = pgTable(
+  'channel_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    channel: varchar('channel', { length: 20 }).notNull(), // sms | whatsapp | ivr | voice_bot
+    isEnabled: boolean('is_enabled').default(false),
+    providerName: varchar('provider_name', { length: 50 }),
+    providerConfig: jsonb('provider_config').default({}), // encrypted configs
+    dailyCap: integer('daily_cap'),
+    hourlyCap: integer('hourly_cap'),
+    updatedBy: uuid('updated_by').references(() => tenantUsers.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantChannelIdx: uniqueIndex('channel_configs_tenant_channel_idx').on(t.tenantId, t.channel),
+  })
+);
+
+// ─── COMMUNICATION TEMPLATES ─────────────────────────────────
+
+export const commTemplates = pgTable(
+  'comm_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    channel: varchar('channel', { length: 20 }).notNull(),
+    dpdBucket: varchar('dpd_bucket', { length: 50 }),
+    language: varchar('language', { length: 10 }).notNull().default('en'),
+    body: text('body').notNull(),
+    variables: jsonb('variables').default([]),
+    mediaUrl: text('media_url'),
+    version: integer('version').notNull().default(1),
+    isActive: boolean('is_active').default(true),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('comm_templates_tenant_id_idx').on(t.tenantId),
+    tenantChannelBucketIdx: index('comm_templates_tenant_channel_bucket_idx').on(t.tenantId, t.channel, t.dpdBucket),
+  })
+);
+
+// ─── WORKFLOW RULES ──────────────────────────────────────────
+
+export const workflowRules = pgTable(
+  'workflow_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    bucketId: uuid('bucket_id')
+      .notNull()
+      .references(() => dpdBucketConfigs.id),
+    templateId: uuid('template_id').references(() => commTemplates.id),
+    channel: varchar('channel', { length: 20 }).notNull(),
+    priority: integer('priority').notNull().default(1),
+    delayDays: integer('delay_days').default(0),
+    repeatIntervalDays: integer('repeat_interval_days'),
+    scheduleCron: varchar('schedule_cron', { length: 50 }),
+    isActive: boolean('is_active').default(true),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('workflow_rules_tenant_id_idx').on(t.tenantId),
+    tenantBucketIdx: index('workflow_rules_tenant_bucket_idx').on(t.tenantId, t.bucketId),
+    tenantChannelIdx: index('workflow_rules_tenant_channel_idx').on(t.tenantId, t.channel),
+  })
+);
+
+// ─── QUEUE STATE ─────────────────────────────────────────────
+
+export const jobQueue = pgTable(
+  'job_queue',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').references(() => tenants.id), // null for platform jobs
+    jobType: varchar('job_type', { length: 50 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    payload: jsonb('payload').notNull(),
+    priority: integer('priority').default(5),
+    attempts: integer('attempts').default(0),
+    maxAttempts: integer('max_attempts').default(3),
+    claimedBy: varchar('claimed_by', { length: 100 }),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    claimExpiresAt: timestamp('claim_expires_at', { withTimezone: true }),
+    runAfter: timestamp('run_after', { withTimezone: true }).defaultNow(),
+    result: jsonb('result'),
+    lastError: text('last_error'),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    nextRetryAt: timestamp('next_retry_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    statusRunAfterPriorityIdx: index('job_queue_status_runafter_priority_idx').on(t.status, t.runAfter, t.priority),
+    tenantJobTypeStatusIdx: index('job_queue_tenant_jobtype_status_idx').on(t.tenantId, t.jobType, t.status),
+    claimExpiresAtIdx: index('job_queue_claim_expires_at_idx').on(t.claimExpiresAt),
+  })
+);
+
+export const batchRuns = pgTable(
+  'batch_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    jobId: uuid('job_id').references(() => jobQueue.id),
+    batchType: varchar('batch_type', { length: 30 }).notNull(),
+    sourceRef: uuid('source_ref'),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    totalRecords: integer('total_records').default(0),
+    processed: integer('processed').default(0),
+    succeeded: integer('succeeded').default(0),
+    failed: integer('failed').default(0),
+    skipped: integer('skipped').default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantBatchTypeStatusIdx: index('batch_runs_tenant_batchtype_status_idx').on(t.tenantId, t.batchType, t.status),
+    jobIdIdx: index('batch_runs_job_id_idx').on(t.jobId),
+    sourceRefIdx: index('batch_runs_source_ref_idx').on(t.sourceRef),
+  })
+);
+
+export const batchErrors = pgTable(
+  'batch_errors',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    batchRunId: uuid('batch_run_id')
+      .notNull()
+      .references(() => batchRuns.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    rowIndex: integer('row_index'),
+    recordRef: varchar('record_ref', { length: 50 }),
+    errorCode: varchar('error_code', { length: 50 }),
+    errorMessage: text('error_message'),
+    rawData: jsonb('raw_data'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    batchRunIdIdx: index('batch_errors_batch_run_id_idx').on(t.batchRunId),
+    tenantBatchRunIdIdx: index('batch_errors_tenant_batch_run_id_idx').on(t.tenantId, t.batchRunId),
+  })
+);
+
+export const scheduledJobs = pgTable(
+  'scheduled_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').references(() => tenants.id),
+    jobType: varchar('job_type', { length: 50 }).notNull(),
+    cronExpression: varchar('cron_expression', { length: 50 }).notNull(),
+    payloadTemplate: jsonb('payload_template').default({}),
+    isActive: boolean('is_active').default(true),
+    lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+    lastRunStatus: varchar('last_run_status', { length: 20 }),
+    lastJobId: uuid('last_job_id').references(() => jobQueue.id),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true }).notNull(),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    isActiveNextRunAtIdx: index('scheduled_jobs_isactive_nextrunat_idx').on(t.isActive, t.nextRunAt),
+    tenantIdIdx: index('scheduled_jobs_tenant_id_idx').on(t.tenantId),
+  })
+);
+
+// ─── COMMUNICATION EVENTS ────────────────────────────────────
+
+export const commEvents = pgTable(
+  'comm_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    recordId: uuid('record_id')
+      .notNull()
+      .references(() => portfolioRecords.id),
+    ruleId: uuid('rule_id').references(() => workflowRules.id),
+    templateId: uuid('template_id').references(() => commTemplates.id),
+    jobId: uuid('job_id').references(() => jobQueue.id),
+    channel: varchar('channel', { length: 20 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('scheduled'),
+    resolvedBody: text('resolved_body'),
+    resolvedFields: jsonb('resolved_fields').default({}),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+    queuedAt: timestamp('queued_at', { withTimezone: true }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    idempotencyKey: varchar('idempotency_key', { length: 150 }).notNull().unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('comm_events_tenant_id_idx').on(t.tenantId),
+    recordIdIdx: index('comm_events_record_id_idx').on(t.recordId),
+    tenantStatusIdx: index('comm_events_tenant_status_idx').on(t.tenantId, t.status),
+    tenantScheduledAtIdx: index('comm_events_tenant_scheduled_at_idx').on(t.tenantId, t.scheduledAt),
+    jobIdIdx: index('comm_events_job_id_idx').on(t.jobId),
+  })
+);
+
+export const deliveryLogs = pgTable(
+  'delivery_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => commEvents.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    providerName: varchar('provider_name', { length: 50 }),
+    providerMsgId: varchar('provider_msg_id', { length: 255 }),
+    deliveryStatus: varchar('delivery_status', { length: 30 }),
+    errorCode: varchar('error_code', { length: 50 }),
+    errorMessage: text('error_message'),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    callbackPayload: jsonb('callback_payload').default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    eventIdIdx: index('delivery_logs_event_id_idx').on(t.eventId),
+    tenantIdIdx: index('delivery_logs_tenant_id_idx').on(t.tenantId),
+    providerMsgIdIdx: index('delivery_logs_provider_msg_id_idx').on(t.providerMsgId),
+  })
+);
+
+// ─── OPT-OUT / DNC ───────────────────────────────────────────
+
+export const optOutList = pgTable(
+  'opt_out_list',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').references(() => tenants.id), // null = global platform level DNC
+    mobile: varchar('mobile', { length: 15 }).notNull(),
+    channel: varchar('channel', { length: 20 }),
+    reason: varchar('reason', { length: 100 }),
+    source: varchar('source', { length: 30 }),
+    optedOutAt: timestamp('opted_out_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantMobileIdx: index('opt_out_list_tenant_mobile_idx').on(t.tenantId, t.mobile),
+    mobileIdx: index('opt_out_list_mobile_idx').on(t.mobile),
+  })
+);
+
+// ─── REPORTS ─────────────────────────────────────────────────
+
+export const reportJobs = pgTable(
+  'report_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    jobId: uuid('job_id').references(() => jobQueue.id),
+    requestedBy: uuid('requested_by').references(() => tenantUsers.id),
+    reportType: varchar('report_type', { length: 50 }).notNull(),
+    filters: jsonb('filters').default({}),
+    status: varchar('status', { length: 20 }).notNull().default('queued'),
+    fileUrl: text('file_url'),
+    errorMessage: text('error_message'),
+    queuedAt: timestamp('queued_at', { withTimezone: true }).defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => ({
+    tenantIdIdx: index('report_jobs_tenant_id_idx').on(t.tenantId),
+    tenantStatusIdx: index('report_jobs_tenant_status_idx').on(t.tenantId, t.status),
+    jobIdIdx: index('report_jobs_job_id_idx').on(t.jobId),
+  })
+);
+
+// ─── AUDIT LOG ───────────────────────────────────────────────
+
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').references(() => tenants.id),
+    actorId: uuid('actor_id'),
+    actorType: varchar('actor_type', { length: 20 }), // tenant_user | platform_user | system | worker
+    action: varchar('action', { length: 100 }).notNull(),
+    entityType: varchar('entity_type', { length: 50 }),
+    entityId: uuid('entity_id'),
+    oldValue: jsonb('old_value'),
+    newValue: jsonb('new_value'),
+    ipAddress: varchar('ip_address', { length: 45 }), // Using varchar for inet
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('audit_logs_tenant_id_idx').on(t.tenantId),
+    tenantActionIdx: index('audit_logs_tenant_action_idx').on(t.tenantId, t.action),
+    entityTypeEntityIdIdx: index('audit_logs_entity_type_entity_id_idx').on(t.entityType, t.entityId),
+    createdAtIdx: index('audit_logs_created_at_idx').on(t.createdAt),
+  })
+);
