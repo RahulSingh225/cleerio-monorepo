@@ -1,52 +1,99 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { db, jobQueue } from '@platform/drizzle';
+import { db, jobQueue, commEvents } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql, and } from 'drizzle-orm';
+import { 
+  PortfoliosService, 
+  PortfolioRecordsService, 
+  WorkflowRulesService,
+  EligibilityService 
+} from '@platform/domain';
 
 @Injectable()
 export class JobQueueService extends BaseRepository<typeof jobQueue> {
   private readonly logger = new Logger(JobQueueService.name);
 
-  constructor() {
-    // Note: Overriding default tenant behavior because workers pull tasks across ALL tenants globally,
-    // but execute them per tenant inside the task payload.
-    // BaseRepository is designed safely.
+  constructor(
+    private readonly portfolioService: PortfoliosService,
+    private readonly recordsService: PortfolioRecordsService,
+    private readonly workflowService: WorkflowRulesService,
+    private readonly eligibilityService: EligibilityService,
+  ) {
     super(jobQueue, db);
   }
 
-  // Polls the DB every 5 seconds for pending jobs
   @Cron(CronExpression.EVERY_5_SECONDS)
   async processPendingJobs() {
-    this.logger.log('Polling for pending jobs...');
-    // We execute a raw driver level query using SKIP LOCKED
-    // Drizzle currently supports raw SQL execution elegantly
-    
-    // Begin transaction for safe locking
     await this._db.transaction(async (tx) => {
-        // Find 10 pending jobs concurrently locked by this worker
-        const lockedJobsRes = await tx.execute<{ id: string }>(sql`
-            SELECT id FROM job_queue
+        const lockedJobsRes = await tx.execute<{ id: string, job_type: string, payload: any }>(sql`
+            SELECT id, job_type, payload FROM job_queue
             WHERE status = 'pending' AND scheduled_for <= NOW()
             ORDER BY priority ASC, created_at ASC
-            LIMIT 10
+            LIMIT 5
             FOR UPDATE SKIP LOCKED;
         `);
         
-        const lockedIds = lockedJobsRes.rows.map(r => String(r.id));
+        const rows = lockedJobsRes.rows;
+        if (rows.length === 0) return;
 
-        if (lockedIds.length > 0) {
-            // Mark them as running instantly to prevent other crons grabbing them just in case
-            await tx.update(jobQueue).set({ status: 'running', updatedAt: new Date() }).where(inArray(jobQueue.id, lockedIds));
-            this.logger.log(`Locked and processing ${lockedIds.length} jobs.`);
+        for (const row of rows) {
+            const jobId = String(row.id);
+            await tx.update(jobQueue).set({ status: 'running', updatedAt: new Date() }).where(eq(jobQueue.id, jobId));
             
-            // Note: Inside a real production system, dispatch them async so transaction commits quickly.
-            // For now, simulating processing
-            for (const id of lockedIds) {
-                // simulate job processing success
-                await tx.update(jobQueue).set({ status: 'completed', updatedAt: new Date() }).where(eq(jobQueue.id, id));
+            try {
+                if (row.job_type === 'portfolio.ingest') {
+                    await this.handlePortfolioIngest(row.payload.portfolioId, row.payload.tenantId);
+                }
+                
+                await tx.update(jobQueue).set({ status: 'completed', updatedAt: new Date() }).where(eq(jobQueue.id, jobId));
+            } catch (err) {
+                this.logger.error(`Job ${jobId} failed: ${err.message}`);
+                await tx.update(jobQueue).set({ status: 'failed', updatedAt: new Date() }).where(eq(jobQueue.id, jobId));
             }
         }
     });
+  }
+
+  /**
+   * For each record in the portfolio, find matching workflow rules and generate CommEvents
+   */
+  async handlePortfolioIngest(portfolioId: string, tenantId: string) {
+    this.logger.log(`Processing ingestion for portfolio: ${portfolioId}`);
+
+    // 1. Fetch all records for this portfolio
+    const records = await this.recordsService._db.select().from(sql.raw('portfolio_records')).where(and(
+        eq(sql.raw('portfolio_id'), portfolioId),
+        eq(sql.raw('tenant_id'), tenantId)
+    ));
+
+    for (const record of records as any) {
+        if (!record.dpdBucket) continue;
+
+        // 2. Fetch active workflow rules for this bucket
+        const rules = await this.workflowService.fetchActiveRulesForBucket(record.dpdBucket);
+
+        for (const rule of rules) {
+            // 3. Check Eligibility (Opt-out, Caps, etc.)
+            const isEligible = await this.eligibilityService.evaluateRecordEligibility(record.id, 'sms'); // Default to SMS for now
+            
+            if (isEligible.eligible) {
+                // 4. Generate CommEvent
+                const scheduledAt = new Date();
+                scheduledAt.setDate(scheduledAt.getDate() + (rule.delayDays || 0));
+
+                await this._db.insert(commEvents).values({
+                    tenantId,
+                    recordId: record.id,
+                    ruleId: rule.id,
+                    templateId: rule.templateId,
+                    channel: 'sms',
+                    status: 'scheduled',
+                    scheduledAt, // Fixed column name from schema
+                    idempotencyKey: `ingest_${record.id}_${rule.id}`, // Unique key for safety
+                });
+            }
+        }
+    }
   }
 }

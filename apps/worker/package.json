@@ -25,6 +25,7 @@
     "@nestjs/microservices": "^11.1.17",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.1",
+    "@platform/domain": "workspace:*",
     "@platform/drizzle": "workspace:*",
     "@platform/tenant": "workspace:*",
     "kafkajs": "^2.2.4",

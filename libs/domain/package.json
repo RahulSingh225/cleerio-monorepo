@@ -1,0 +1,22 @@
+{
+  "name": "@platform/domain",
+  "version": "1.0.0",
+  "description": "Shared domain models and logic for Cleerio",
+  "main": "index.ts",
+  "dependencies": {
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
+    "@platform/drizzle": "workspace:*",
+    "@platform/common": "workspace:*",
+    "@platform/tenant": "workspace:*",
+    "class-validator": "^0.15.1",
+    "class-transformer": "^0.5.1",
+    "drizzle-orm": "^0.45.2",
+    "papaparse": "^5.5.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+     "@types/papaparse": "^5.3.15"
+  }
+}

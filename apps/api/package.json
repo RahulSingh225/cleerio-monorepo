@@ -26,6 +26,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@platform/common": "workspace:*",
+    "@platform/domain": "workspace:*",
     "@platform/drizzle": "workspace:*",
     "@platform/kafka": "workspace:*",
     "@platform/tenant": "workspace:*",
