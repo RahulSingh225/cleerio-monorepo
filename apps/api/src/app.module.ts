@@ -12,8 +12,9 @@ import {
   ChannelConfigsModule,
   CommTemplatesModule,
   WorkflowRulesModule,
-  ReportsModule,
+  JobsModule,
 } from '@platform/domain';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import {
     ChannelConfigsModule,
     CommTemplatesModule,
     WorkflowRulesModule,
+    JobsModule,
     ReportsModule,
   ],
   controllers: [AppController],

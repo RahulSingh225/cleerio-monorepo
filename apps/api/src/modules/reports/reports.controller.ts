@@ -1,7 +1,8 @@
 import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { ApiResponseConfig } from '@platform/common';
-import { JwtAuthGuard, TenantGuard } from '@platform/domain';
+import { JwtAuthGuard } from '@platform/domain';
+import { TenantGuard } from '@platform/tenant';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, TenantGuard)

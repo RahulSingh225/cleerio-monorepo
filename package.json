@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"npm run dev --prefix apps/api\" \"npm run dev --prefix apps/worker\" \"npm run dev --prefix apps/dashboard\""
   },
   "keywords": [],
   "author": "",
@@ -13,9 +14,17 @@
   "dependencies": {
     "@nestjs/common": "^11.1.17",
     "@nestjs/core": "^11.1.17",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.17",
+    "@nestjs/testing": "^11.1.17",
+    "@types/multer": "^2.1.0",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "drizzle-orm": "^0.45.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
@@ -23,6 +32,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/pg": "^8.20.0",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.3.1",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.21.0"

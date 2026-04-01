@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, UnauthorizedException, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -13,7 +14,10 @@ export class AuthController {
     message: 'Login successful',
     apiCode: 'AUTH_LOGIN_SUCCESS',
   })
-  async login(@Body() loginDto: LoginDto) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response
+  ) {
     let user;
 
     if (loginDto.tenantId) {
@@ -35,7 +39,24 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.authService.login(user);
+    const { access_token } = await this.authService.login(user);
+    
+    response.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    });
+
+    return {
+      user: {
+        id: user.id || user.sub,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+        isPlatformUser: user.isPlatformUser,
+      },
+    };
   }
 
   @UseGuards(JwtAuthGuard)

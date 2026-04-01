@@ -20,6 +20,14 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "paths": {
+      "@platform/common": ["../../libs/common"],
+      "@platform/domain": ["../../libs/domain/src"],
+      "@platform/drizzle": ["../../libs/drizzle"],
+      "@platform/kafka": ["../../libs/kafka"],
+      "@platform/tenant": ["../../libs/tenant"],
+      "@platform/*": ["../../libs/*"]
+    }
   }
 }

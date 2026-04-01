@@ -16,7 +16,7 @@ export class KafkaService {
             jobType: 'portfolio_ingest_recalc',
             payload: payload,
             status: 'pending',
-            scheduledFor: new Date(),
+            runAfter: new Date(),
             priority: 1 // High Priority
         });
         this.logger.log(`Job scheduled successfully in job_queue table for Tenant: ${payload.tenantId}`);

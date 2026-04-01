@@ -62,7 +62,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
     this.logger.log(`Processing ingestion for portfolio: ${portfolioId}`);
 
     // 1. Fetch all records for this portfolio
-    const records = await this.recordsService._db.select().from(sql.raw('portfolio_records')).where(and(
+    const records = await db.select().from(sql.raw('portfolio_records')).where(and(
         eq(sql.raw('portfolio_id'), portfolioId),
         eq(sql.raw('tenant_id'), tenantId)
     ));

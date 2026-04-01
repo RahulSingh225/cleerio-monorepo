@@ -30,3 +30,6 @@ export * from './modules/portfolios/portfolios.service';
 
 export * from './modules/portfolio-records/portfolio-records.module';
 export * from './modules/portfolio-records/portfolio-records.service';
+
+export * from './modules/jobs/jobs.module';
+export * from './modules/jobs/jobs.service';

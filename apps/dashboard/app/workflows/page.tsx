@@ -38,7 +38,7 @@ export default function WorkflowBuilder() {
     const parser = new WorkflowParser();
     try {
       await parser.deploy(nodes, edges);
-      alert('Strategy successfully deployed to production! 🚀');
+      alert('Strategy successfully deployed back to infrastructure! 🚀');
     } catch (err) {
       alert('Deployment failed. Verify your node connections.');
     } finally {
@@ -47,42 +47,50 @@ export default function WorkflowBuilder() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#F9FAFB]">
-      {/* Figma Refined Toolbar */}
-      <div className="h-16 border-b border-[#E4E4E7] bg-white flex items-center justify-between px-8 z-10 shadow-sm">
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-3">
-             <div className="p-2 rounded-lg bg-blue-600/5 text-blue-600 border border-blue-600/10">
+    <div className="flex flex-col h-screen bg-[#09090B] font-sans selection:bg-blue-500/30">
+      {/* Premium Dark Toolbar */}
+      <div className="h-20 border-b border-white/5 bg-[#0D0D10]/80 backdrop-blur-2xl flex items-center justify-between px-10 z-20 shadow-2xl">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+             <div className="p-2.5 rounded-2xl bg-blue-600/10 text-blue-500 border border-blue-500/20 shadow-lg shadow-blue-500/10">
                 <Activity className="h-5 w-5" />
              </div>
              <div className="flex flex-col">
-                <h1 className="text-[15px] font-bold tracking-tight text-[#111827]">Strategy Orchestration</h1>
+                <h1 className="text-[16px] font-black tracking-tight text-white uppercase italic">Strategy Orchestration</h1>
                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                   <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest leading-none">Draft: NBFC_APR_V2</span>
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+                   <span className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] leading-none">Draft: NBFC_APR_OPS_V4</span>
                 </div>
              </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
+          <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3">
+             <div className="flex -space-x-2">
+                {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-[#0D0D10] bg-zinc-800" />)}
+             </div>
+             <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-none">4 Online</span>
+          </div>
           <button 
             onClick={handleDeploy}
             disabled={isDeploying}
-            className="flex items-center gap-2.5 px-5 py-2 text-[12px] font-black bg-[#111827] text-white rounded-xl hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-950/10 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-3 px-7 py-3.5 text-[11px] font-black bg-white text-black rounded-2xl hover:bg-zinc-200 transition-all shadow-[0_15px_40px_-5px_rgba(255,255,255,0.15)] active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden relative"
           >
-            {isDeploying ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4 fill-emerald-400 text-emerald-400 group-hover:scale-125 transition-transform" />
-            )}
-            Deploy Transfer
+            <span className="relative z-10 flex items-center gap-3">
+                {isDeploying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                <Zap className="h-4 w-4 fill-blue-600 text-blue-600 group-hover:scale-125 transition-transform" />
+                )}
+                Finalize Strategy
+            </span>
           </button>
         </div>
       </div>
 
       {/* Strategy Canvas */}
-      <div className="flex-1 relative overflow-hidden bg-white">
+      <div className="flex-1 relative overflow-hidden">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -91,40 +99,42 @@ export default function WorkflowBuilder() {
           onConnect={onConnect}
           nodeTypes={nodeTypes}
           fitView
-          colorMode="light"
+          colorMode="dark"
           defaultEdgeOptions={{ 
             animated: true,
-            style: { strokeWidth: 2, stroke: '#3B82F6' }
+            style: { strokeWidth: 3, stroke: '#3B82F6' }
           }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={28} size={1} color="#E5E7EB" />
-          <Controls className="!bg-white !border-[#E4E4E7] !shadow-xl !rounded-xl overflow-hidden" shadow={false} />
+          <Background variant={BackgroundVariant.Dots} gap={32} size={1} color="#27272A" />
+          <Controls className="!bg-[#18181B] !border-white/10 !shadow-2xl !rounded-2xl overflow-hidden [&_button]:!border-white/5 [&_button]:!bg-transparent [&_button]:!text-zinc-500 hover:[&_button]:!bg-white/5" position="bottom-left" />
           
           <Panel position="bottom-center" className="mb-12">
-             <div className="bg-white/95 border border-[#E4E4E7] px-8 py-4 rounded-[24px] flex items-center gap-10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-xl ring-1 ring-black/5 ring-inset">
+             <div className="bg-[#18181B]/80 border border-white/10 px-10 py-5 rounded-[40px] flex items-center gap-12 shadow-[0_40px_100px_rgba(0,0,0,1)] backdrop-blur-[40px] ring-1 ring-white/5 ring-inset">
                 {[
-                  { icon: Database, label: 'Source', type: 'source' },
-                  { icon: Shuffle, label: 'Mapper', type: 'mapper' },
-                  { icon: Sparkles, label: 'AI Agent', type: 'agent' },
-                  { icon: Mail, label: 'Channel', type: 'action' },
+                  { icon: Database, label: 'Source', type: 'source', color: 'emerald' },
+                  { icon: Shuffle, label: 'Mapper', type: 'mapper', color: 'violet' },
+                  { icon: Sparkles, label: 'Agent', type: 'agent', color: 'indigo' },
+                  { icon: Smartphone, label: 'Channel', type: 'action', color: 'blue' },
                 ].map((item, idx) => (
                   <div 
                     key={idx} 
-                    className="flex flex-col items-center gap-2 group cursor-pointer transition-all hover:-translate-y-2"
+                    className="flex flex-col items-center gap-3 group cursor-pointer transition-all hover:-translate-y-2"
                     onClick={() => {
-                       const newNode = {
-                          id: `${Date.now()}`,
+                        const id = `${Date.now()}`;
+                        const newNode = {
+                          id,
                           type: item.type,
-                          position: { x: Math.random() * 400, y: Math.random() * 400 },
-                          data: { label: item.label, mappings: [], templateId: 'TPL_DEFAULT' }
+                          position: { x: 400 + Math.random() * 100, y: 150 + Math.random() * 100 },
+                          data: { label: item.label, mappings: [], templateId: 'TPL_DEFAULT' },
+                          className: 'animate-in zoom-in duration-300'
                        };
                        useWorkflowStore.getState().addNode(newNode as any);
                     }}
                   >
-                    <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all bg-zinc-50 border-zinc-200 text-zinc-600 group-hover:border-blue-600 group-hover:text-blue-600`}>
-                       <item.icon className="h-6 w-6" />
+                    <div className={`w-16 h-16 rounded-[24px] border border-white/5 flex items-center justify-center transition-all bg-black shadow-xl group-hover:border-${item.color}-500/50 group-hover:shadow-${item.color}-500/20 group-hover:text-${item.color}-500 text-zinc-600`}>
+                       <item.icon className="h-7 w-7" />
                     </div>
-                    <span className="text-[10px] uppercase tracking-[0.2em] font-black text-zinc-400 group-hover:text-zinc-600 transition-colors">
+                    <span className="text-[9px] uppercase tracking-[0.3em] font-black text-zinc-600 group-hover:text-zinc-300 transition-colors">
                       {item.label}
                     </span>
                   </div>
@@ -134,5 +144,14 @@ export default function WorkflowBuilder() {
         </ReactFlow>
       </div>
     </div>
+  );
+}
+
+function Smartphone({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+      <path d="M12 18h.01"/>
+    </svg>
   );
 }
