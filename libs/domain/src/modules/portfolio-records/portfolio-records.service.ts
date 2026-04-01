@@ -27,6 +27,13 @@ export class PortfolioRecordsService extends BaseRepository<typeof portfolioReco
   }
 
   async insertBulkRecords(records: any[]) {
-    return this._db.insert(portfolioRecords).values(records).returning();
+    const chunkSize = 500;
+    let results: any[] = [];
+    for (let i = 0; i < records.length; i += chunkSize) {
+      const chunk = records.slice(i, i + chunkSize);
+      const inserted = await this._db.insert(portfolioRecords).values(chunk).returning();
+      results = results.concat(inserted);
+    }
+    return results;
   }
 }

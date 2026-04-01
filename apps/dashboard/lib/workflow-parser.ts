@@ -1,18 +1,8 @@
 import { Node, Edge } from '@xyflow/react';
-import axios from 'axios';
+import { api } from './api';
 
-/**
- * The WorkflowParser is the "one-click deploy" engine.
- * It translates the visual React Flow graph into Cleerio's 
- * Drizzle-backed configuration APIs.
- */
 export class WorkflowParser {
-  private api = axios.create({
-    baseURL: 'http://localhost:3000',
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
+  private api = api;
 
   async deploy(nodes: Node[], edges: Edge[]) {
     console.log('Deploying strategy orchestration...');

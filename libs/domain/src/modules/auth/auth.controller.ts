@@ -18,6 +18,7 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response
   ) {
+    console.log('Login attempt for Refine flow:', loginDto);
     let user;
 
     if (loginDto.tenantId) {
@@ -56,6 +57,7 @@ export class AuthController {
         tenantId: user.tenantId,
         isPlatformUser: user.isPlatformUser,
       },
+      accessToken: access_token,
     };
   }
 

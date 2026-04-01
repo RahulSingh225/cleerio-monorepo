@@ -6,75 +6,135 @@
 }
 
 :root {
-  /* Figma Orchestration Light Theme */
-  --background: #F9FAFB;
+  /* ─── Figma Light Theme Tokens ─── */
+  --background: #F5F6F8;
   --foreground: #111827;
-  
-  /* Sidebar (Nocturnal) */
-  --sidebar-bg: #18181B;
-  --sidebar-border: #27272A;
-  
-  /* Node Essentials */
-  --node-bg: #FFFFFF;
-  --node-border: #E4E4E7;
-  --node-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
-  
-  /* Brand Accents */
-  --accent: #3B82F6;
+
+  /* Surfaces */
+  --surface: #FFFFFF;
+  --surface-secondary: #F9FAFB;
+  --surface-hover: #F3F4F6;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+
+  /* Brand */
+  --primary: #2D5BFF;
+  --primary-hover: #1D4FE8;
+  --primary-light: #EEF2FF;
+  --primary-text: #FFFFFF;
+
+  /* Semantic */
   --success: #10B981;
+  --success-bg: #ECFDF5;
   --warning: #F59E0B;
+  --warning-bg: #FFFBEB;
   --critical: #EF4444;
+  --critical-bg: #FEF2F2;
+  --info: #3B82F6;
+  --info-bg: #EFF6FF;
+
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-inverse: #FFFFFF;
+
+  /* Sidebar */
+  --sidebar-bg: #FFFFFF;
+  --sidebar-border: #E5E7EB;
+  --sidebar-active: #EEF2FF;
+  --sidebar-text: #6B7280;
+  --sidebar-text-active: #2D5BFF;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', sans-serif;
-  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* React Flow Figma Styling */
+/* ─── Shared Component Classes ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-hover:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+  transition: all 0.2s ease;
+}
+
+/* ─── React Flow Figma Styling ─── */
 .react-flow__handle {
   width: 8px;
   height: 8px;
-  background: var(--accent);
+  background: var(--primary);
   border: 2px solid white;
 }
 
 .react-flow__edge-path {
-  stroke: var(--accent);
+  stroke: var(--primary);
   stroke-width: 2;
   opacity: 0.6;
 }
 
 .react-flow__controls {
   background: white;
-  border: 1px solid var(--node-border);
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .react-flow__controls-button {
-  border-bottom: 1px solid var(--node-border);
+  border-bottom: 1px solid var(--border);
 }
 
-/* Figma Component Classes */
-.glass-sidebar {
-  background: rgba(24, 24, 27, 0.85);
-  backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
 }
 
-.figma-node {
-  background: var(--node-bg);
-  border: 1px solid var(--node-border);
-  border-radius: 8px;
-  box-shadow: var(--node-shadow);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.figma-node:hover {
-  border-color: var(--accent);
-  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1);
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
 }

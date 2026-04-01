@@ -28,7 +28,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
     await this._db.transaction(async (tx) => {
         const lockedJobsRes = await tx.execute<{ id: string, job_type: string, payload: any }>(sql`
             SELECT id, job_type, payload FROM job_queue
-            WHERE status = 'pending' AND scheduled_for <= NOW()
+            WHERE status = 'pending' AND run_after <= NOW()
             ORDER BY priority ASC, created_at ASC
             LIMIT 5
             FOR UPDATE SKIP LOCKED;

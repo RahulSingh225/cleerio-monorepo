@@ -2,19 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  BarChart3, 
-  Workflow, 
-  Database, 
-  Settings, 
-  Users, 
-  Layers,
-  Activity,
-  Zap,
+import {
   LayoutDashboard,
+  Users,
+  Bot,
+  Workflow,
+  BarChart3,
+  Settings,
+  LogOut,
   ShieldCheck,
   Cpu,
-  LogOut
+  Briefcase,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -31,127 +29,103 @@ export function Sidebar() {
   const isPlatformAdmin = user?.role === 'platform_admin' || user?.isPlatformUser;
 
   const navigation = [
-    // Platform Level
-    { 
-      name: 'Tenants', 
-      href: '/admin/tenants', 
-      icon: ShieldCheck, 
-      show: isPlatformAdmin 
-    },
-    { 
-      name: 'System Jobs', 
-      href: '/admin/jobs', 
-      icon: Cpu, 
-      show: isPlatformAdmin 
-    },
-    
-    // Tenant Level
-    { 
-      name: 'Intelligence', 
-      href: '/insights', 
-      icon: BarChart3, 
-      show: true 
-    },
-    { 
-      name: 'Orchestration', 
-      href: '/workflows', 
-      icon: Workflow, 
-      show: !isPlatformAdmin 
-    },
-    { 
-      name: 'Portfolios', 
-      href: '/portfolios', 
-      icon: Database, 
-      show: !isPlatformAdmin 
-    },
-    { 
-      name: 'Risk Buckets', 
-      href: '/settings/buckets', 
-      icon: Layers, 
-      show: !isPlatformAdmin 
-    },
-    { 
-      name: 'Channels', 
-      href: '/settings/channels', 
-      icon: Zap, 
-      show: user?.role === 'tenant_admin' 
-    },
-    { 
-      name: 'Team', 
-      href: '/team', 
-      icon: Users, 
-      show: user?.role === 'tenant_admin' 
-    },
-    { 
-      name: 'Settings', 
-      href: '/settings', 
-      icon: Settings, 
-      show: !isPlatformAdmin 
-    },
+    // Platform admin 
+    { name: 'Tenants', href: '/admin/tenants', icon: ShieldCheck, show: isPlatformAdmin },
+    { name: 'System Jobs', href: '/admin/jobs', icon: Cpu, show: isPlatformAdmin },
+
+    // Tenant navigation (matches Figma sidebar)
+    { name: 'Dashboard', href: '/insights', icon: LayoutDashboard, show: true },
+    { name: 'Case Management', href: '/cases', icon: Briefcase, show: !isPlatformAdmin },
+    { name: 'Strategies', href: '/workflows', icon: Workflow, show: !isPlatformAdmin },
+    { name: 'AI Insights', href: '/portfolios', icon: Bot, show: !isPlatformAdmin },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3, show: !isPlatformAdmin },
+    { name: 'Settings', href: '/settings', icon: Settings, show: !isPlatformAdmin },
   ];
 
   return (
-    <div className="flex flex-col h-full w-64 border-r border-white/5 bg-[#09090B] backdrop-blur-3xl shadow-[20px_0_40px_-20px_rgba(0,0,0,0.5)]">
-      {/* Brand Header */}
-      <div className="flex h-20 items-center px-8 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
+    <div className="flex flex-col h-full w-60 border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)]">
+      {/* Brand */}
+      <div className="flex h-16 items-center px-5 border-b border-[var(--sidebar-border)]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[14px] bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30 border border-white/10 ring-1 ring-white/5">
-             <Zap className="w-5 h-5 text-white fill-current" />
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" />
+            </svg>
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-black tracking-tighter text-white uppercase italic">Cleerio.ai</span>
-            <span className="text-[9px] text-blue-500 font-black tracking-[0.2em] leading-none uppercase">
-                {isPlatformAdmin ? 'Platform' : 'Tenant'}
+            <span className="text-sm font-bold text-[var(--text-primary)] tracking-tight">Cleerio.ai</span>
+            <span className="text-[10px] text-[var(--text-tertiary)] font-medium">
+              {isPlatformAdmin ? 'Platform Admin' : 'Admin Panel'}
             </span>
           </div>
         </div>
       </div>
+
+      {/* Main Menu Label */}
+      <div className="px-5 pt-6 pb-2">
+        <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Main Menu</span>
+      </div>
       
-      <div className="flex flex-1 flex-col overflow-y-auto px-4 py-8 space-y-1.5 custom-scrollbar">
+      {/* Navigation */}
+      <div className="flex flex-1 flex-col overflow-y-auto px-3 space-y-0.5">
         {navigation.filter(item => item.show).map((item) => {
-          const isActive = pathname.startsWith(item.href);
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}
               href={item.href}
               className={`
-                group flex items-center px-4 py-3 text-[11px] font-black uppercase tracking-widest rounded-2xl transition-all duration-300 border border-transparent
-                ${isActive 
-                  ? 'bg-gradient-to-tr from-blue-600 to-blue-500 text-white shadow-[0_10px_20px_-10px_rgba(59,130,246,0.5)] border-white/10' 
-                  : 'text-zinc-600 hover:text-zinc-200 hover:bg-white/[0.03] hover:border-white/5'
+                group flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-all duration-150
+                ${isActive
+                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)]'
+                  : 'text-[var(--sidebar-text)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
                 }
               `}
             >
-              <item.icon className={`
-                 mr-4 h-4 w-4 flex-shrink-0 transition-all
-                 ${isActive ? 'text-white' : 'text-zinc-700 group-hover:text-blue-500 group-hover:scale-110'}
-              `} />
+              <item.icon className={`h-[18px] w-[18px] flex-shrink-0 ${
+                isActive ? 'text-[var(--sidebar-text-active)]' : 'text-[var(--text-tertiary)]'
+              }`} />
               {item.name}
             </Link>
           );
         })}
       </div>
 
-      <div className="p-4 border-t border-white/5 bg-gradient-to-t from-white/[0.01] to-transparent">
-        <div className="flex items-center gap-3 px-4 py-3 rounded-[20px] bg-zinc-900/40 border border-white/5 relative group">
-           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl border border-white/10 flex items-center justify-center font-black text-[10px] text-white">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
-           </div>
-           <div className="flex flex-col overflow-hidden flex-1">
-              <span className="text-[11px] font-black text-white truncate uppercase tracking-tight">
-                {user?.name || user?.email?.split('@')[0]}
-              </span>
-              <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter truncate">
-                {user?.role || 'User'}
-              </span>
-           </div>
-           <button 
-             onClick={handleLogout}
-             className="p-2 rounded-lg text-zinc-600 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
-             title="Secure Log Out"
-           >
-             <LogOut className="h-4 w-4" />
-           </button>
+      {/* System section */}
+      <div className="px-5 pb-2 pt-4">
+        <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">System</span>
+      </div>
+      <div className="px-3 pb-3">
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg text-[var(--sidebar-text)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all"
+        >
+          <Settings className="h-[18px] w-[18px] text-[var(--text-tertiary)]" />
+          Settings
+        </Link>
+      </div>
+
+      {/* User Profile Footer */}
+      <div className="p-3 border-t border-[var(--sidebar-border)]">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--surface-hover)] transition-colors group">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+            {user?.email?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+              {user?.name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-[11px] text-[var(--text-tertiary)] capitalize truncate">
+              {user?.role?.replace('_', ' ') || 'User'}
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>

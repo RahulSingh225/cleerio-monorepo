@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
@@ -8,8 +7,12 @@ import { ApiExceptionFilter, ApiResponseInterceptor } from '@platform/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
+  // Allow any origin in development to support cross-network access (mobile/tablets)
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: (origin, callback) => {
+      // In development, we can be more permissive
+      callback(null, true);
+    },
     credentials: true,
   });
 
@@ -27,6 +30,6 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap();

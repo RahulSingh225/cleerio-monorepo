@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { db, platformUsers, tenantUsers } from '@platform/drizzle';
-import { eq } from 'drizzle-orm';
+import { db, platformUsers, tenantUsers, tenants } from '@platform/drizzle';
+import { eq, and } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -17,15 +17,27 @@ export class AuthService {
     return null;
   }
 
-  async validateTenantUser(email: string, pass: string, tenantId: string): Promise<any> {
+  async validateTenantUser(email: string, pass: string, tenantCode: string): Promise<any> {
+    // 1. Resolve Tenant by Code
+    const [tenant] = await db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.code, tenantCode))
+      .limit(1);
+
+    if (!tenant) return null;
+
+    // 2. Resolve User within that Tenant
     const [user] = await db
         .select()
         .from(tenantUsers)
-        .where(eq(tenantUsers.email, email))
+        .where(and(
+          eq(tenantUsers.email, email),
+          eq(tenantUsers.tenantId, tenant.id)
+        ))
         .limit(1);
         
-    // In real app we also check if user.tenantId === tenantId
-    if (user && user.tenantId === tenantId && await bcrypt.compare(pass, user.passwordHash || '')) {
+    if (user && await bcrypt.compare(pass, user.passwordHash || '')) {
       const { passwordHash, ...result } = user;
       return { ...result, isPlatformUser: false };
     }

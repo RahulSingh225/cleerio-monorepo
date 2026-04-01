@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env from the root of the monorepo
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+// Also try the local .env if cwd is the root
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';

@@ -11,6 +11,6 @@ export class LoginDto {
   password: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   tenantId?: string; // Optional: Required for tenant logins, skipped for platform logins
 }

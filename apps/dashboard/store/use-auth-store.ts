@@ -1,10 +1,5 @@
 import { create } from 'zustand';
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1',
-  withCredentials: true,
-});
+import { api } from '@/lib/api';
 
 interface AuthState {
   user: any | null;
