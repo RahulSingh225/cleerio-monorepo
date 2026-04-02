@@ -1,34 +1,54 @@
-# Walkthrough: Phase 5 - Job Queue & Background Worker
+# Monorepo Orchestration Walkthrough
 
-We have completely built out the backend Foundation spanning robust Asynchronous computing for Collections processing!
+The Cleerio monorepo is now fully functional, with all services (API, Worker, Dashboard) and infrastructure dependencies successfully running on Windows.
 
-## What was Accomplished
+## Key Changes and Fixes
 
-### 1. Isolated `apps/worker` Microservice
-- Converted `apps/worker/src/main.ts` from a standard HTTP application into a pure **NestJS Microservice** bounded strictly over the `Transport.KAFKA` interface!
-- Built connecting links directly to your workspace level libraries: `@platform/drizzle` and `@platform/tenant` removing code duplication!
+### 1. TypeScript Module Resolution
+- **Issue**: Services were failing to resolve `@platform/*` workspace libraries.
+- **Fix**: Added explicit `paths` mappings to `apps/api/tsconfig.json` and `apps/worker/tsconfig.json`.
 
-### 2. Kafka Message Processing
-- Added `KafkaController` listening cleanly via `@EventPattern` to the `portfolio.ingest` stream.
-- When an ingestion event occurs, the `KafkaService` intercepts the payload securely and *submits it locally into the Postgres `job_queue` table* with `pending` status. This completely shields the system from missing messages or dropped microservices; if Kafka crashes, Postgres holds the state safely to be retried!
+### 2. Dependency Management
+- **Issue**: `libs/domain` was missing critical NestJS and authentication dependencies.
+- **Fix**: Installed `@nestjs/jwt`, `@nestjs/passport`, `passport`, `passport-jwt`, `bcrypt`, and `@nestjs/platform-express` at the root and in the domain library to ensure availability.
 
-### 3. FOR UPDATE SKIP LOCKED Architecture
-- Designed `JobQueueService` within `apps/worker/src/job-queue`.
-- Attached `@nestjs/schedule` utilizing a `@Cron(CronExpression.EVERY_5_SECONDS)`.
-- It executes a fully native Driver-level transaction directly through Drizzle:
-    ```sql
-    SELECT id FROM job_queue
-    WHERE status = 'pending' AND scheduled_for <= NOW()
-    ORDER BY priority ASC, created_at ASC
-    LIMIT 10
-    FOR UPDATE SKIP LOCKED;
-    ```
-- This guarantees horizontally scalable Worker architectures. You can spin up **100 docker containers** of `apps/worker`, and *not a single one of them* will grab the same portfolio to process, saving memory and eliminating race conditions!
+### 3. API & Worker Code Correctness
+- **Issue**: Incorrect imports and protected property access were blocking compilation.
+- **Fix**:
+    - Relocated `ReportsModule` to the API's local modules to avoid circular or missing dependencies.
+    - Updated `ReportsController` to import `TenantGuard` from the correct `@platform/tenant` library.
+    - Fixed `JobQueueService` in the Worker to use the public `db` instance instead of accessing protected members of other services.
+    - Updated `KafkaService` to use the correct schema column (`runAfter` instead of `scheduledFor`).
 
-## Final Backend Phase Progress
-> [!NOTE] 
-> We have completed the foundational backend NestJS architecture! The system now supports multi-tenancy context isolation across its DB, features robust DPD & eligibility logic, allows typed JSONB searches in Drizzle, exposes API REST upload ingestion interfaces, and cleanly delegates heavy processing loops down into locked Kafka+Postgres worker queues. 
+### 4. Windows Runtime Resolution
+- **Issue**: Standard `nest start` or `tsx` commands were failing on the `D:` drive with "Cannot find module 'D'".
+- **Fix**: Implemented a more robust launch command using explicit relative module registration:
+  `node -r ts-node/register -r tsconfig-paths/register src/main.ts`
 
-We can proceed to finalize any minor backend testing or immediately transition into the **Next.js 16 Dashboard Frontend** (which will involve shading our Figma UI mapping!). 
+### 5. Infrastructure
+- **Kafka**: Updated `docker-compose.yml` to use the official `apache/kafka` image in KRaft mode, replacing incompatible Bitnami environment variables.
 
-Would you like to wrap up any remaining Backend logic or jump directly into sketching and scaffolding the **Next.js Dashboard UI**?
+## Current Service Status
+
+| Service | Port | Status | Command |
+| :--- | :--- | :--- | :--- |
+| **API** | 3000 | **RUNNING** | `node -r ts-node/register ...` |
+| **Worker** | 3001 | **RUNNING** | `node -r ts-node/register ...` |
+| **Dashboard** | 3002 | **RUNNING** | `npm run dev` |
+
+## Verification
+
+### API Check
+The API logs show a successful startup:
+```text
+[Nest] 27524  - 01/04/2026, 1:41:33 pm     LOG [NestApplication] Nest application successfully started +3ms
+```
+
+### Worker Check
+The Worker logs show successful Cron and Kafka service initialization:
+```text
+[Nest] 9536   - 01/04/2026, 1:41:34 pm     LOG [Worker] Scheduled processing jobs started.
+```
+
+### Infrastructure Check
+The Docker Compose stack is healthy. Kafka, Postgres, Redis, and Minio are responding on their respective ports.
