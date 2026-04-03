@@ -13,7 +13,7 @@ export class KafkaService {
     try {
         await db.insert(jobQueue).values({
             tenantId: payload.tenantId,
-            jobType: 'portfolio_ingest_recalc',
+            jobType: 'portfolio.ingest',
             payload: payload,
             status: 'pending',
             runAfter: new Date(),

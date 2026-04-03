@@ -404,6 +404,9 @@ importers:
       '@platform/tenant':
         specifier: workspace:*
         version: link:../tenant
+      axios:
+        specifier: ^1.13.2
+        version: 1.14.0
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0

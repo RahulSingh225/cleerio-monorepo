@@ -5,6 +5,7 @@ import { TenantMiddleware } from '@platform/tenant';
 import {
   AuthModule,
   TenantsModule,
+  TenantUsersModule,
   TenantFieldRegistryModule,
   PortfoliosModule,
   PortfolioRecordsModule,
@@ -13,6 +14,14 @@ import {
   CommTemplatesModule,
   WorkflowRulesModule,
   JobsModule,
+  RepaymentSyncsModule,
+  OptOutModule,
+  CommEventsModule,
+  BatchRunsModule,
+  DeliveryLogsModule,
+  ScheduledJobsModule,
+  AuditLogsModule,
+  ReportJobsModule,
 } from '@platform/domain';
 import { ReportsModule } from './modules/reports/reports.module';
 
@@ -20,6 +29,7 @@ import { ReportsModule } from './modules/reports/reports.module';
   imports: [
     AuthModule,
     TenantsModule,
+    TenantUsersModule,
     TenantFieldRegistryModule,
     PortfoliosModule,
     PortfolioRecordsModule,
@@ -29,12 +39,20 @@ import { ReportsModule } from './modules/reports/reports.module';
     WorkflowRulesModule,
     JobsModule,
     ReportsModule,
+    RepaymentSyncsModule,
+    OptOutModule,
+    CommEventsModule,
+    BatchRunsModule,
+    DeliveryLogsModule,
+    ScheduledJobsModule,
+    AuditLogsModule,
+    ReportJobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes('*'); // Apply tenant parsing to all routes
+    consumer.apply(TenantMiddleware).forRoutes('*');
   }
 }

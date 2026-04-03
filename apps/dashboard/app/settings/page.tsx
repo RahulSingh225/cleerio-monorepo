@@ -3,9 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/page-header';
-import { Layers, MessageSquare, FileText, ChevronRight } from 'lucide-react';
+import { Layers, MessageSquare, FileText, Database, ShieldOff, ChevronRight } from 'lucide-react';
 
 const settingsItems = [
+  {
+    title: 'Field Registry',
+    description: 'Map CSV column headers to stable field keys for data ingestion and template rendering.',
+    href: '/settings/field-registry',
+    icon: Database,
+    color: 'bg-indigo-50 text-indigo-600',
+  },
   {
     title: 'DPD Bucket Configuration',
     description: 'Define risk tiers based on days past due for targeted collection strategies.',
@@ -26,6 +33,13 @@ const settingsItems = [
     href: '/settings/templates',
     icon: FileText,
     color: 'bg-violet-50 text-violet-600',
+  },
+  {
+    title: 'Opt-Out / DNC List',
+    description: 'Manage Do Not Contact list for regulatory compliance.',
+    href: '/settings/opt-out',
+    icon: ShieldOff,
+    color: 'bg-red-50 text-red-600',
   },
 ];
 

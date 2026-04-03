@@ -13,6 +13,11 @@ import {
   ShieldCheck,
   Cpu,
   Briefcase,
+  Radio,
+  FileText,
+  Activity,
+  ClipboardList,
+  Clock,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -32,12 +37,17 @@ export function Sidebar() {
     // Platform admin 
     { name: 'Tenants', href: '/admin/tenants', icon: ShieldCheck, show: isPlatformAdmin },
     { name: 'System Jobs', href: '/admin/jobs', icon: Cpu, show: isPlatformAdmin },
+    { name: 'Batch Runs', href: '/admin/batch-runs', icon: Activity, show: isPlatformAdmin },
+    { name: 'Audit Logs', href: '/admin/audit-logs', icon: ClipboardList, show: isPlatformAdmin },
+    { name: 'Scheduled Jobs', href: '/admin/scheduled-jobs', icon: Clock, show: isPlatformAdmin },
 
-    // Tenant navigation (matches Figma sidebar)
+    // Tenant navigation
     { name: 'Dashboard', href: '/insights', icon: LayoutDashboard, show: true },
     { name: 'Case Management', href: '/cases', icon: Briefcase, show: !isPlatformAdmin },
     { name: 'Strategies', href: '/workflows', icon: Workflow, show: !isPlatformAdmin },
+    { name: 'Communications', href: '/communications', icon: Radio, show: !isPlatformAdmin },
     { name: 'AI Insights', href: '/portfolios', icon: Bot, show: !isPlatformAdmin },
+    { name: 'Reports', href: '/reports', icon: FileText, show: !isPlatformAdmin },
     { name: 'Analytics', href: '/analytics', icon: BarChart3, show: !isPlatformAdmin },
     { name: 'Settings', href: '/settings', icon: Settings, show: !isPlatformAdmin },
   ];

@@ -7,6 +7,9 @@ import {
   WorkflowRulesModule,
   DpdBucketConfigsModule,
   CommTemplatesModule,
+  ChannelConfigsModule,
+  CommEventsModule,
+  DeliveryLogsModule,
 } from '@platform/domain';
 
 @Module({
@@ -17,8 +20,12 @@ import {
     WorkflowRulesModule,
     DpdBucketConfigsModule,
     CommTemplatesModule,
+    ChannelConfigsModule,
+    CommEventsModule,
+    DeliveryLogsModule,
   ],
   providers: [JobQueueService],
   exports: [JobQueueService],
 })
 export class JobQueueModule {}
+
