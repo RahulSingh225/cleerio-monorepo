@@ -10,7 +10,7 @@ exports.JobQueueModule = void 0;
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 const job_queue_service_1 = require("./job-queue.service");
-const domain_1 = require("../../../../libs/domain/src/index.ts");
+const domain_1 = require("../../../../libs/domain/src");
 let JobQueueModule = class JobQueueModule {
 };
 exports.JobQueueModule = JobQueueModule;
@@ -20,9 +20,13 @@ exports.JobQueueModule = JobQueueModule = __decorate([
             schedule_1.ScheduleModule.forRoot(),
             domain_1.PortfoliosModule,
             domain_1.PortfolioRecordsModule,
-            domain_1.WorkflowRulesModule,
             domain_1.DpdBucketConfigsModule,
             domain_1.CommTemplatesModule,
+            domain_1.ChannelConfigsModule,
+            domain_1.CommEventsModule,
+            domain_1.DeliveryLogsModule,
+            domain_1.SegmentationRunsModule,
+            domain_1.SegmentsModule,
         ],
         providers: [job_queue_service_1.JobQueueService],
         exports: [job_queue_service_1.JobQueueService],

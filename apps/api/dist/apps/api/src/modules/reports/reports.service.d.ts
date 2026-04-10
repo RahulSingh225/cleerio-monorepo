@@ -3,7 +3,7 @@ export declare class ReportsService {
     getPortfolioSummary(tenantId: string, portfolioId?: string): Promise<{
         totalRecords: number;
         totalOutstanding: string;
-        totalOverdue: string;
+        totalRepaid: string;
         activeBorrowers: number;
         portfolioId: string;
     }>;

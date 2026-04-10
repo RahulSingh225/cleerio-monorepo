@@ -47,8 +47,8 @@ exports.PortfoliosService = void 0;
 const common_1 = require("@nestjs/common");
 const Papa = __importStar(require("papaparse"));
 const drizzle_orm_1 = require("drizzle-orm");
-const drizzle_1 = require("../../../../drizzle/index.ts");
-const repository_1 = require("@platform/drizzle/repository");
+const drizzle_1 = require("../../../../drizzle");
+const repository_1 = require("../../../../drizzle/repository");
 const tenant_field_registry_service_1 = require("../tenant-field-registry/tenant-field-registry.service");
 const dpd_bucket_configs_service_1 = require("../dpd-bucket-configs/dpd-bucket-configs.service");
 const portfolio_records_service_1 = require("../portfolio-records/portfolio-records.service");
@@ -118,6 +118,14 @@ let PortfoliosService = PortfoliosService_1 = class PortfoliosService extends re
                         if (recordsToInsert.length > 0) {
                             await this.recordsService.insertBulkRecords(recordsToInsert);
                         }
+                        await drizzle_1.db.insert(drizzle_1.taskQueue).values({
+                            tenantId,
+                            jobType: 'portfolio.ingest',
+                            status: 'pending',
+                            payload: { portfolioId, tenantId },
+                            priority: 1,
+                            runAfter: new Date(),
+                        });
                         await this.update((0, drizzle_orm_1.eq)(drizzle_1.portfolios.id, portfolioId), {
                             status: 'completed',
                             totalRecords: recordsToInsert.length,

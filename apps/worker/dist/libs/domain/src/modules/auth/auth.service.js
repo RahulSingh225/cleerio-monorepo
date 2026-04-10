@@ -45,7 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
-const drizzle_1 = require("../../../../drizzle/index.ts");
+const drizzle_1 = require("../../../../drizzle");
 const drizzle_orm_1 = require("drizzle-orm");
 const bcrypt = __importStar(require("bcrypt"));
 let AuthService = class AuthService {
@@ -61,13 +61,20 @@ let AuthService = class AuthService {
         }
         return null;
     }
-    async validateTenantUser(email, pass, tenantId) {
+    async validateTenantUser(email, pass, tenantCode) {
+        const [tenant] = await drizzle_1.db
+            .select()
+            .from(drizzle_1.tenants)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.tenants.code, tenantCode))
+            .limit(1);
+        if (!tenant)
+            return null;
         const [user] = await drizzle_1.db
             .select()
             .from(drizzle_1.tenantUsers)
-            .where((0, drizzle_orm_1.eq)(drizzle_1.tenantUsers.email, email))
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(drizzle_1.tenantUsers.email, email), (0, drizzle_orm_1.eq)(drizzle_1.tenantUsers.tenantId, tenant.id)))
             .limit(1);
-        if (user && user.tenantId === tenantId && await bcrypt.compare(pass, user.passwordHash || '')) {
+        if (user && await bcrypt.compare(pass, user.passwordHash || '')) {
             const { passwordHash, ...result } = user;
             return { ...result, isPlatformUser: false };
         }

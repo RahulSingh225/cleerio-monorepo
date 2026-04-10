@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { desc } from 'drizzle-orm';
+import { desc, eq, and } from 'drizzle-orm';
 import { db, auditLogs } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 
@@ -29,15 +29,12 @@ export class AuditLogsService extends BaseRepository<typeof auditLogs> {
   async findAllFiltered(filters?: { action?: string; entityType?: string }) {
     const conditions: any[] = [];
     if (filters?.action) {
-      const { eq } = await import('drizzle-orm');
       conditions.push(eq(auditLogs.action, filters.action));
     }
     if (filters?.entityType) {
-      const { eq } = await import('drizzle-orm');
       conditions.push(eq(auditLogs.entityType, filters.entityType));
     }
 
-    const { and } = await import('drizzle-orm');
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     return this.findMany({ where, orderBy: desc(auditLogs.createdAt) });
   }

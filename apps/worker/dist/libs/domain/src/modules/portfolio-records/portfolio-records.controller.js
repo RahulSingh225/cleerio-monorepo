@@ -15,11 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PortfolioRecordsController = void 0;
 const common_1 = require("@nestjs/common");
 const portfolio_records_service_1 = require("./portfolio-records.service");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
-const tenant_1 = require("../../../../tenant/index.ts");
+const tenant_1 = require("../../../../tenant");
 const drizzle_orm_1 = require("drizzle-orm");
-const drizzle_1 = require("../../../../drizzle/index.ts");
+const drizzle_1 = require("../../../../drizzle");
 let PortfolioRecordsController = class PortfolioRecordsController {
     recordsService;
     constructor(recordsService) {

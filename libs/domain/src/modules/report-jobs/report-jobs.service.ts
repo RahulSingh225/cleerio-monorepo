@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { eq, desc } from 'drizzle-orm';
-import { db, reportJobs, jobQueue } from '@platform/drizzle';
+import { db, reportJobs, taskQueue } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class ReportJobsService extends BaseRepository<typeof reportJobs> {
     filters?: any;
   }) {
     // 1. Create job_queue entry
-    const [job] = await db.insert(jobQueue).values({
+    const [job] = await db.insert(taskQueue).values({
       tenantId: data.tenantId,
       jobType: 'report.generate',
       status: 'pending',

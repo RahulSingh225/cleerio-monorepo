@@ -16,12 +16,12 @@ exports.ChannelConfigsController = void 0;
 const common_1 = require("@nestjs/common");
 const channel_configs_service_1 = require("./channel-configs.service");
 const update_channel_config_dto_1 = require("./dto/update-channel-config.dto");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
-const tenant_1 = require("../../../../tenant/index.ts");
+const tenant_1 = require("../../../../tenant");
 const drizzle_orm_1 = require("drizzle-orm");
-const drizzle_1 = require("../../../../drizzle/index.ts");
+const drizzle_1 = require("../../../../drizzle");
 let ChannelConfigsController = class ChannelConfigsController {
     channelService;
     constructor(channelService) {

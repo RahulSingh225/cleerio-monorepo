@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as Papa from 'papaparse';
 import { eq, SQL } from 'drizzle-orm';
-import { db, portfolios, portfolioRecords, jobQueue } from '@platform/drizzle';
+import { db, portfolios, portfolioRecords, taskQueue } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 import { AuthenticatedUser } from '@platform/common';
 import { TenantFieldRegistryService } from '../tenant-field-registry/tenant-field-registry.service';
@@ -103,7 +103,7 @@ export class PortfoliosService extends BaseRepository<typeof portfolios> {
             }
 
             // 3. Create a Job for the worker to process strategies
-            await db.insert(jobQueue).values({
+            await db.insert(taskQueue).values({
               tenantId,
               jobType: 'portfolio.ingest',
               status: 'pending',

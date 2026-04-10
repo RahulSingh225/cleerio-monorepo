@@ -12,11 +12,26 @@ export declare class TenantsController {
         createdBy: string | null;
         createdAt: Date | null;
         updatedAt: Date | null;
+        deletedAt: Date | null;
     }[]>;
     findOne(code: string): Promise<{
         [x: string]: any;
     }>;
     findAll(): Promise<{
         [x: string]: any;
+    }[]>;
+    findById(id: string): Promise<{
+        [x: string]: any;
+    }>;
+    update(id: string, data: Partial<CreateTenantDto>): Promise<{
+        id: string;
+        name: string;
+        code: string;
+        status: string;
+        settings: unknown;
+        createdBy: string | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+        deletedAt: Date | null;
     }[]>;
 }

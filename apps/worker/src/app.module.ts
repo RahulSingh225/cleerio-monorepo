@@ -5,12 +5,16 @@ import { KafkaModule } from './kafka/kafka.module';
 import {
   PortfoliosModule,
   PortfolioRecordsModule,
-  WorkflowRulesModule,
   CommTemplatesModule,
   DpdBucketConfigsModule,
   CommEventsModule,
   DeliveryLogsModule,
-  BatchRunsModule,
+  // V2 Modules
+  SegmentsModule,
+  SegmentationRunsModule,
+  JourneysModule,
+  InteractionEventsModule,
+  RepaymentModule,
 } from '@platform/domain';
 
 @Module({
@@ -20,12 +24,16 @@ import {
     KafkaModule,
     PortfoliosModule,
     PortfolioRecordsModule,
-    WorkflowRulesModule,
     CommTemplatesModule,
     DpdBucketConfigsModule,
     CommEventsModule,
     DeliveryLogsModule,
-    BatchRunsModule,
+    // V2 Modules
+    SegmentsModule,
+    SegmentationRunsModule,
+    JourneysModule,
+    InteractionEventsModule,
+    RepaymentModule,
   ],
 })
 export class AppModule {}

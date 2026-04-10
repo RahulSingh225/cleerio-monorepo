@@ -118,6 +118,14 @@ let PortfoliosService = PortfoliosService_1 = class PortfoliosService extends re
                         if (recordsToInsert.length > 0) {
                             await this.recordsService.insertBulkRecords(recordsToInsert);
                         }
+                        await drizzle_1.db.insert(drizzle_1.taskQueue).values({
+                            tenantId,
+                            jobType: 'portfolio.ingest',
+                            status: 'pending',
+                            payload: { portfolioId, tenantId },
+                            priority: 1,
+                            runAfter: new Date(),
+                        });
                         await this.update((0, drizzle_orm_1.eq)(drizzle_1.portfolios.id, portfolioId), {
                             status: 'completed',
                             totalRecords: recordsToInsert.length,

@@ -1,0 +1,56 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.JourneyStepsService = void 0;
+const common_1 = require("@nestjs/common");
+const drizzle_orm_1 = require("drizzle-orm");
+const drizzle_1 = require("../../../../drizzle");
+const repository_1 = require("../../../../drizzle/repository");
+let JourneyStepsService = class JourneyStepsService extends repository_1.BaseRepository {
+    constructor() {
+        super(drizzle_1.journeySteps, drizzle_1.db);
+    }
+    async createStep(data) {
+        return this._db.insert(drizzle_1.journeySteps).values(data).returning();
+    }
+    async updateStep(id, data) {
+        return this._db
+            .update(drizzle_1.journeySteps)
+            .set({ ...data, updatedAt: new Date() })
+            .where((0, drizzle_orm_1.eq)(drizzle_1.journeySteps.id, id))
+            .returning();
+    }
+    async deleteStep(id) {
+        return this._db.delete(drizzle_1.journeySteps).where((0, drizzle_orm_1.eq)(drizzle_1.journeySteps.id, id)).returning();
+    }
+    async findByJourney(journeyId) {
+        return this._db
+            .select()
+            .from(drizzle_1.journeySteps)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.journeySteps.journeyId, journeyId))
+            .orderBy(drizzle_1.journeySteps.stepOrder)
+            .execute();
+    }
+    async reorder(journeyId, stepIds) {
+        for (let i = 0; i < stepIds.length; i++) {
+            await this._db
+                .update(drizzle_1.journeySteps)
+                .set({ stepOrder: i + 1, updatedAt: new Date() })
+                .where((0, drizzle_orm_1.eq)(drizzle_1.journeySteps.id, stepIds[i]));
+        }
+    }
+};
+exports.JourneyStepsService = JourneyStepsService;
+exports.JourneyStepsService = JourneyStepsService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [])
+], JourneyStepsService);
+//# sourceMappingURL=journey-steps.service.js.map

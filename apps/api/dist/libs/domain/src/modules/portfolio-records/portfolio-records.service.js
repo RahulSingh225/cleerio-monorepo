@@ -24,7 +24,14 @@ let PortfolioRecordsService = class PortfolioRecordsService extends repository_1
         return undefined;
     }
     async insertBulkRecords(records) {
-        return this._db.insert(drizzle_1.portfolioRecords).values(records).returning();
+        const chunkSize = 500;
+        let results = [];
+        for (let i = 0; i < records.length; i += chunkSize) {
+            const chunk = records.slice(i, i + chunkSize);
+            const inserted = await this._db.insert(drizzle_1.portfolioRecords).values(chunk).returning();
+            results = results.concat(inserted);
+        }
+        return results;
     }
 };
 exports.PortfolioRecordsService = PortfolioRecordsService;

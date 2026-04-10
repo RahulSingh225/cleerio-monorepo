@@ -19,7 +19,7 @@ export class ReportsService {
       .select({
         totalRecords: count(),
         totalOutstanding: sum(portfolioRecords.outstanding),
-        totalOverdue: sum(portfolioRecords.overdue),
+        totalRepaid: sum(portfolioRecords.totalRepaid),
         activeBorrowers: count(portfolioRecords.id),
       })
       .from(portfolioRecords)
@@ -28,7 +28,7 @@ export class ReportsService {
     return {
       totalRecords: Number(result?.totalRecords) || 0,
       totalOutstanding: result?.totalOutstanding || '0',
-      totalOverdue: result?.totalOverdue || '0',
+      totalRepaid: result?.totalRepaid || '0',
       activeBorrowers: Number(result?.activeBorrowers) || 0,
       portfolioId: portfolioId || 'ALL',
     };
@@ -42,7 +42,7 @@ export class ReportsService {
       .select({
         bucket: portfolioRecords.dpdBucket,
         count: count(),
-        totalOverdue: sum(portfolioRecords.overdue),
+        totalOverdue: sum(portfolioRecords.outstanding),
       })
       .from(portfolioRecords)
       .where(eq(portfolioRecords.tenantId, tenantId))

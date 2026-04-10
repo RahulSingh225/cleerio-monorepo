@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TenantsService = void 0;
 const common_1 = require("@nestjs/common");
+const drizzle_orm_1 = require("drizzle-orm");
 const drizzle_1 = require("../../../../drizzle");
 const repository_1 = require("../../../../drizzle/repository");
 let TenantsService = class TenantsService extends repository_1.BaseRepository {
@@ -23,11 +24,16 @@ let TenantsService = class TenantsService extends repository_1.BaseRepository {
     async getTenantByCode(code) {
         return this.findFirst((0, drizzle_orm_1.eq)(drizzle_1.tenants.code, code));
     }
+    async getTenantById(id) {
+        return this.findFirst((0, drizzle_orm_1.eq)(drizzle_1.tenants.id, id));
+    }
+    async updateTenant(id, data) {
+        return this._db.update(drizzle_1.tenants).set({ ...data, updatedAt: new Date() }).where((0, drizzle_orm_1.eq)(drizzle_1.tenants.id, id)).returning();
+    }
 };
 exports.TenantsService = TenantsService;
 exports.TenantsService = TenantsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [])
 ], TenantsService);
-const drizzle_orm_1 = require("drizzle-orm");
 //# sourceMappingURL=tenants.service.js.map

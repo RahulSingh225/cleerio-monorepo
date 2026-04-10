@@ -16,10 +16,10 @@ exports.TenantFieldRegistryController = void 0;
 const common_1 = require("@nestjs/common");
 const tenant_field_registry_service_1 = require("./tenant-field-registry.service");
 const create_field_mapping_dto_1 = require("./dto/create-field-mapping.dto");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
-const tenant_1 = require("../../../../tenant/index.ts");
+const tenant_1 = require("../../../../tenant");
 let TenantFieldRegistryController = class TenantFieldRegistryController {
     registryService;
     constructor(registryService) {

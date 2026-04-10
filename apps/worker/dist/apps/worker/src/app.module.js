@@ -8,22 +8,30 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 const job_queue_module_1 = require("./job-queue/job-queue.module");
 const kafka_module_1 = require("./kafka/kafka.module");
-const domain_1 = require("../../../libs/domain/src/index.ts");
+const domain_1 = require("../../../libs/domain/src");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            schedule_1.ScheduleModule.forRoot(),
             job_queue_module_1.JobQueueModule,
             kafka_module_1.KafkaModule,
             domain_1.PortfoliosModule,
             domain_1.PortfolioRecordsModule,
-            domain_1.WorkflowRulesModule,
             domain_1.CommTemplatesModule,
             domain_1.DpdBucketConfigsModule,
+            domain_1.CommEventsModule,
+            domain_1.DeliveryLogsModule,
+            domain_1.SegmentsModule,
+            domain_1.SegmentationRunsModule,
+            domain_1.JourneysModule,
+            domain_1.InteractionEventsModule,
+            domain_1.RepaymentModule,
         ],
     })
 ], AppModule);

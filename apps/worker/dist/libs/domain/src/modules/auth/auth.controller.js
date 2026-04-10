@@ -17,13 +17,14 @@ const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
         this.authService = authService;
     }
-    async login(loginDto) {
+    async login(loginDto, response) {
+        console.log('Login attempt for Refine flow:', loginDto);
         let user;
         if (loginDto.tenantId) {
             user = await this.authService.validateTenantUser(loginDto.email, loginDto.password, loginDto.tenantId);
@@ -34,7 +35,23 @@ let AuthController = class AuthController {
         if (!user) {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
-        return this.authService.login(user);
+        const { access_token } = await this.authService.login(user);
+        response.cookie('access_token', access_token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 1000 * 60 * 60 * 24,
+        });
+        return {
+            user: {
+                id: user.id || user.sub,
+                email: user.email,
+                role: user.role,
+                tenantId: user.tenantId,
+                isPlatformUser: user.isPlatformUser,
+            },
+            accessToken: access_token,
+        };
     }
     getProfile(req) {
         return req.user;
@@ -48,8 +65,9 @@ __decorate([
         apiCode: 'AUTH_LOGIN_SUCCESS',
     }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [login_dto_1.LoginDto]),
+    __metadata("design:paramtypes", [login_dto_1.LoginDto, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([

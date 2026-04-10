@@ -18,7 +18,7 @@ async function seed() {
     { header: 'Mobile Number', label: 'mobile', type: 'string', isCore: true },
     { header: 'product', label: 'product', type: 'string', isCore: true },
     { header: 'current_dpd', label: 'currentDpd', type: 'number', isCore: true },
-    { header: 'over_due', label: 'overdue', type: 'number', isCore: true },
+    { header: 'over_due', label: 'overdue', type: 'number', isCore: false },
     { header: 'outstandings', label: 'outstanding', type: 'number', isCore: true },
   ];
 

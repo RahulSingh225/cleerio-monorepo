@@ -1,34 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { db, jobQueue, commEvents, portfolioRecords, commTemplates, channelConfigs, deliveryLogs } from '@platform/drizzle';
+import { db, taskQueue, commEvents, portfolioRecords, commTemplates, channelConfigs, deliveryLogs, journeySteps } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 import { eq, and, sql, lte } from 'drizzle-orm';
-import { 
-  PortfoliosService, 
-  PortfolioRecordsService, 
-  WorkflowRulesService,
-  EligibilityService,
-  CommunicationService,
+import {
+  PortfoliosService,
+  PortfolioRecordsService,
+  SegmentationRunsService,
   TemplateRendererService,
-  ChannelConfigsService,
   DeliveryLogsService,
 } from '@platform/domain';
 
 @Injectable()
-export class JobQueueService extends BaseRepository<typeof jobQueue> {
+export class JobQueueService extends BaseRepository<typeof taskQueue> {
   private readonly logger = new Logger(JobQueueService.name);
 
   constructor(
     private readonly portfolioService: PortfoliosService,
     private readonly recordsService: PortfolioRecordsService,
-    private readonly workflowService: WorkflowRulesService,
-    private readonly eligibilityService: EligibilityService,
-    private readonly communicationService: CommunicationService,
+    private readonly segmentationRunsService: SegmentationRunsService,
     private readonly templateRenderer: TemplateRendererService,
-    private readonly channelConfigsService: ChannelConfigsService,
     private readonly deliveryLogsService: DeliveryLogsService,
   ) {
-    super(jobQueue, db);
+    super(taskQueue, db);
   }
 
   // ─── MAIN JOB POLLER ──────────────────────────────────────────
@@ -40,7 +34,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
 
     await this._db.transaction(async (tx) => {
       const lockedJobsRes = await tx.execute<{ id: string; job_type: string; payload: any }>(sql`
-        SELECT id, job_type, payload FROM job_queue
+        SELECT id, task_type as job_type, payload FROM task_queue
         WHERE status = 'pending' AND run_after <= NOW()
         ORDER BY priority ASC, created_at ASC
         LIMIT 5
@@ -52,7 +46,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
 
       const ids = rows.map((r) => String(r.id));
       for (const id of ids) {
-        await tx.update(jobQueue).set({ status: 'processing', updatedAt: new Date() }).where(eq(jobQueue.id, id));
+        await tx.update(taskQueue).set({ status: 'processing', updatedAt: new Date() }).where(eq(taskQueue.id, id));
       }
       claimedJobs = rows.map((r) => ({ id: String(r.id), job_type: r.job_type, payload: r.payload }));
     });
@@ -64,6 +58,9 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
           case 'portfolio.ingest':
             await this.handlePortfolioIngest(job.payload.portfolioId, job.payload.tenantId);
             break;
+          case 'segmentation.run':
+            await this.handleSegmentationRun(job.payload.tenantId);
+            break;
           case 'comm.dispatch':
             await this.handleCommDispatch(job.payload.tenantId, job.id);
             break;
@@ -71,15 +68,15 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
             this.logger.warn(`Unknown job type: ${job.job_type}`);
         }
 
-        await this._db.update(jobQueue).set({ status: 'completed', completedAt: new Date(), updatedAt: new Date() }).where(eq(jobQueue.id, job.id));
+        await this._db.update(taskQueue).set({ status: 'completed', completedAt: new Date(), updatedAt: new Date() }).where(eq(taskQueue.id, job.id));
       } catch (err: any) {
         this.logger.error(`Job ${job.id} failed: ${err.message}`);
-        await this._db.update(jobQueue).set({
+        await this._db.update(taskQueue).set({
           status: 'failed',
           lastError: err.message,
           failedAt: new Date(),
           updatedAt: new Date(),
-        }).where(eq(jobQueue.id, job.id));
+        }).where(eq(taskQueue.id, job.id));
       }
     }
   }
@@ -89,7 +86,6 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async scheduleCommDispatch() {
-    // Find all scheduled events that are due (scheduledAt <= NOW)
     const dueEvents = await db
       .select({ tenantId: commEvents.tenantId })
       .from(commEvents)
@@ -102,23 +98,23 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
 
       // Check if there's already a pending comm.dispatch job for this tenant
       const existing = await db
-        .select({ id: jobQueue.id })
-        .from(jobQueue)
+        .select({ id: taskQueue.id })
+        .from(taskQueue)
         .where(and(
-          eq(jobQueue.tenantId, tenantId),
-          eq(jobQueue.jobType, 'comm.dispatch'),
-          eq(jobQueue.status, 'pending'),
+          eq(taskQueue.tenantId, tenantId),
+          eq(taskQueue.jobType, 'comm.dispatch'),
+          eq(taskQueue.status, 'pending'),
         ))
         .limit(1);
 
       if (existing.length > 0) continue; // Already queued
 
-      await this._db.insert(jobQueue).values({
+      await this._db.insert(taskQueue).values({
         tenantId,
         jobType: 'comm.dispatch',
         status: 'pending',
         payload: { tenantId },
-        priority: 3, // Higher priority than ingestion
+        priority: 3,
         runAfter: new Date(),
       });
 
@@ -131,39 +127,26 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
   async handlePortfolioIngest(portfolioId: string, tenantId: string) {
     this.logger.log(`Processing ingestion for portfolio: ${portfolioId}`);
 
-    const records = await db
-      .select()
-      .from(portfolioRecords)
-      .where(and(eq(portfolioRecords.portfolioId, portfolioId), eq(portfolioRecords.tenantId, tenantId)));
+    // In v2, after portfolio ingestion, we trigger a segmentation run
+    // to assign records to segments based on the new criteria engine
+    await this._db.insert(taskQueue).values({
+      tenantId,
+      jobType: 'segmentation.run',
+      status: 'pending',
+      payload: { tenantId, triggeredBy: 'portfolio.ingest', portfolioId },
+      priority: 2,
+      runAfter: new Date(),
+    });
 
-    for (const record of records) {
-      if (!record.dpdBucket) continue;
+    this.logger.log(`Queued segmentation.run after ingestion for portfolio: ${portfolioId}`);
+  }
 
-      const rules = await this.workflowService.fetchActiveRulesForBucketName(tenantId, record.dpdBucket);
+  // ─── SEGMENTATION.RUN HANDLER ────────────────────────────────
 
-      for (const rule of rules) {
-        const isEligible = await this.eligibilityService.evaluateRecordEligibility(record.id, rule.channel);
-
-        if (isEligible.eligible) {
-          const scheduledAt = new Date();
-          scheduledAt.setDate(scheduledAt.getDate() + (rule.delayDays || 0));
-          const dateStr = scheduledAt.toISOString().split('T')[0];
-
-          await this._db.insert(commEvents).values({
-            tenantId,
-            recordId: record.id,
-            ruleId: rule.id,
-            templateId: rule.templateId,
-            channel: rule.channel,
-            status: 'scheduled',
-            scheduledAt,
-            idempotencyKey: `${record.id}:${rule.channel}:${dateStr}`,
-          }).onConflictDoNothing();
-        }
-      }
-    }
-
-    this.logger.log(`Completed ingestion for portfolio: ${portfolioId}, processed ${records.length} records`);
+  async handleSegmentationRun(tenantId: string) {
+    this.logger.log(`Processing segmentation run for tenant: ${tenantId}`);
+    await this.segmentationRunsService.processRun(tenantId);
+    this.logger.log(`Completed segmentation run for tenant: ${tenantId}`);
   }
 
   // ─── COMM.DISPATCH HANDLER ─────────────────────────────────────
@@ -194,7 +177,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
     for (const event of dueEvents) {
       try {
         // 2. Mark as queued (in-flight)
-        await db.update(commEvents).set({ status: 'queued', queuedAt: new Date(), jobId }).where(eq(commEvents.id, event.id));
+        await db.update(commEvents).set({ status: 'queued' }).where(eq(commEvents.id, event.id));
 
         // 3. Fetch the portfolio record to get mobile + dynamic fields
         const [record] = await db
@@ -210,17 +193,27 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
           continue;
         }
 
+        // 3b. Fetch the journeyStep to get the templateId
+        let templateId: string | null = null;
+        if (event.journeyStepId) {
+          const [step] = await db
+            .select({ templateId: journeySteps.templateId })
+            .from(journeySteps)
+            .where(eq(journeySteps.id, event.journeyStepId))
+            .limit(1);
+          if (step) templateId = step.templateId;
+        }
+
         // 4. Fetch template body
         let body = '';
-        if (event.templateId) {
+        if (templateId) {
           const [template] = await db
             .select()
             .from(commTemplates)
-            .where(eq(commTemplates.id, event.templateId))
+            .where(eq(commTemplates.id, templateId))
             .limit(1);
 
           if (template) {
-            // Merge core fields + dynamic fields for variable substitution
             const allFields: Record<string, any> = {
               name: record.name,
               mobile: record.mobile,
@@ -228,7 +221,7 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
               product: record.product,
               currentDpd: record.currentDpd,
               dpdBucket: record.dpdBucket,
-              overdue: record.overdue,
+              overdue: record.outstanding,
               outstanding: record.outstanding,
               ...(record.dynamicFields as Record<string, any> || {}),
             };
@@ -245,50 +238,32 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
         }
 
         // 5. Fetch channel config for provider settings
-        const channelConfig = await this.channelConfigsService.getActiveChannel(event.channel);
-        const providerConfig = (channelConfig?.providerConfig as Record<string, any>) || {};
+        const [channelConfig] = await db
+          .select()
+          .from(channelConfigs)
+          .where(and(eq(channelConfigs.tenantId, tenantId), eq(channelConfigs.channel, event.channel), eq(channelConfigs.isEnabled, true)))
+          .limit(1);
 
-        // 6. Dispatch via provider adapter
-        const result = await this.communicationService.dispatchMessage(
-          event.channel,
-          record.mobile,
-          body,
-          providerConfig,
-        );
+        // 6. TODO: Dispatch via provider adapter (placeholder for now)
+        // In production, this would call SMS/WhatsApp/IVR providers
+        this.logger.log(`[DISPATCH] Channel: ${event.channel}, To: ${record.mobile}, Body: ${body.substring(0, 60)}...`);
 
-        // 7. Update event status + write delivery log
-        if (result.success) {
-          await db.update(commEvents).set({
-            status: 'sent',
-            sentAt: new Date(),
-            resolvedBody: body,
-          }).where(eq(commEvents.id, event.id));
+        // 7. Mark as sent + write delivery log
+        await db.update(commEvents).set({
+          status: 'sent',
+          sentAt: new Date(),
+          resolvedBody: body,
+        }).where(eq(commEvents.id, event.id));
 
-          await db.insert(deliveryLogs).values({
-            eventId: event.id,
-            tenantId,
-            providerName: channelConfig?.providerName || event.channel,
-            providerMsgId: result.messageId,
-            deliveryStatus: 'sent',
-          });
+        await db.insert(deliveryLogs).values({
+          eventId: event.id,
+          tenantId,
+          providerName: channelConfig?.providerName || event.channel,
+          providerMsgId: `sim_${Date.now()}`,
+          deliveryStatus: 'sent',
+        });
 
-          sent++;
-        } else {
-          await db.update(commEvents).set({ status: 'failed' }).where(eq(commEvents.id, event.id));
-
-          await db.insert(deliveryLogs).values({
-            eventId: event.id,
-            tenantId,
-            providerName: channelConfig?.providerName || event.channel,
-            providerMsgId: result.messageId,
-            deliveryStatus: 'failed',
-            errorCode: result.errorCode,
-            errorMessage: result.errorMessage,
-            callbackPayload: result.rawResponse,
-          });
-
-          failed++;
-        }
+        sent++;
       } catch (err: any) {
         this.logger.error(`Event ${event.id} dispatch error: ${err.message}`);
         await db.update(commEvents).set({ status: 'failed' }).where(eq(commEvents.id, event.id));
@@ -299,4 +274,3 @@ export class JobQueueService extends BaseRepository<typeof jobQueue> {
     this.logger.log(`comm.dispatch complete for tenant ${tenantId}: ${sent} sent, ${failed} failed out of ${dueEvents.length} events`);
   }
 }
-

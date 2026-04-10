@@ -16,11 +16,11 @@ exports.CommTemplatesController = void 0;
 const common_1 = require("@nestjs/common");
 const comm_templates_service_1 = require("./comm-templates.service");
 const create_template_dto_1 = require("./dto/create-template.dto");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
-const tenant_1 = require("../../../../tenant/index.ts");
+const tenant_1 = require("../../../../tenant");
 const drizzle_orm_1 = require("drizzle-orm");
-const drizzle_1 = require("../../../../drizzle/index.ts");
+const drizzle_1 = require("../../../../drizzle");
 let CommTemplatesController = class CommTemplatesController {
     templateService;
     constructor(templateService) {

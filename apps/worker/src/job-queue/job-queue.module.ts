@@ -4,12 +4,14 @@ import { JobQueueService } from './job-queue.service';
 import {
   PortfoliosModule,
   PortfolioRecordsModule,
-  WorkflowRulesModule,
   DpdBucketConfigsModule,
   CommTemplatesModule,
   ChannelConfigsModule,
   CommEventsModule,
   DeliveryLogsModule,
+  // V2 Modules
+  SegmentationRunsModule,
+  SegmentsModule,
 } from '@platform/domain';
 
 @Module({
@@ -17,15 +19,16 @@ import {
     ScheduleModule.forRoot(),
     PortfoliosModule,
     PortfolioRecordsModule,
-    WorkflowRulesModule,
     DpdBucketConfigsModule,
     CommTemplatesModule,
     ChannelConfigsModule,
     CommEventsModule,
     DeliveryLogsModule,
+    // V2 Modules
+    SegmentationRunsModule,
+    SegmentsModule,
   ],
   providers: [JobQueueService],
   exports: [JobQueueService],
 })
 export class JobQueueModule {}
-

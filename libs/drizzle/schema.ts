@@ -16,6 +16,37 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
+
+export const genUlidFunction = sql`
+-- =============================================
+-- gen_ulid() – ULID generator returning UUID type
+-- =============================================
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION gen_ulid()
+RETURNS uuid
+LANGUAGE plpgsql
+VOLATILE
+AS $$
+DECLARE
+    timestamp_ms bigint;
+    ulid_bytes bytea;
+BEGIN
+    -- Get current timestamp in milliseconds
+    timestamp_ms := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint;
+
+    -- Combine 6 bytes of timestamp and 10 bytes of randomness
+    ulid_bytes := substring(int8send(timestamp_ms) FROM 3 FOR 6) 
+               || gen_random_bytes(10);
+
+    -- Postgres natively encodes the 16 bytes into hex and cast to uuid
+    RETURN encode(ulid_bytes, 'hex')::uuid;
+END;
+$$;
+`;
+
+
 // ─── TENANTS ─────────────────────────────────────────────────
 
 export const tenants = pgTable(
@@ -534,7 +565,7 @@ export const taskQueue = pgTable(
   {
     id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id').references(() => tenants.id),
-    taskType: varchar('task_type', { length: 50 }).notNull(),
+    jobType: varchar('task_type', { length: 50 }).notNull(),
     status: varchar('status', { length: 20 }).default('pending'),
     payload: jsonb('payload').notNull(),
     kafkaTopic: varchar('kafka_topic', { length: 100 }),
@@ -543,8 +574,11 @@ export const taskQueue = pgTable(
     attempts: integer('attempts').default(0),
     runAfter: timestamp('run_after', { withTimezone: true }).defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+    lastError: text('last_error'),
     result: jsonb('result'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   }
 );
 

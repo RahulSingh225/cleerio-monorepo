@@ -24,7 +24,7 @@ let ReportsService = class ReportsService {
             .select({
             totalRecords: (0, drizzle_orm_1.count)(),
             totalOutstanding: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.outstanding),
-            totalOverdue: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.overdue),
+            totalRepaid: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.totalRepaid),
             activeBorrowers: (0, drizzle_orm_1.count)(drizzle_1.portfolioRecords.id),
         })
             .from(drizzle_1.portfolioRecords)
@@ -32,7 +32,7 @@ let ReportsService = class ReportsService {
         return {
             totalRecords: Number(result?.totalRecords) || 0,
             totalOutstanding: result?.totalOutstanding || '0',
-            totalOverdue: result?.totalOverdue || '0',
+            totalRepaid: result?.totalRepaid || '0',
             activeBorrowers: Number(result?.activeBorrowers) || 0,
             portfolioId: portfolioId || 'ALL',
         };
@@ -42,7 +42,7 @@ let ReportsService = class ReportsService {
             .select({
             bucket: drizzle_1.portfolioRecords.dpdBucket,
             count: (0, drizzle_orm_1.count)(),
-            totalOverdue: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.overdue),
+            totalOverdue: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.outstanding),
         })
             .from(drizzle_1.portfolioRecords)
             .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioRecords.tenantId, tenantId))

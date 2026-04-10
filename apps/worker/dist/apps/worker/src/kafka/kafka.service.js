@@ -9,21 +9,21 @@ var KafkaService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KafkaService = void 0;
 const common_1 = require("@nestjs/common");
-const drizzle_1 = require("../../../../libs/drizzle/index.ts");
+const drizzle_1 = require("../../../../libs/drizzle");
 let KafkaService = KafkaService_1 = class KafkaService {
     logger = new common_1.Logger(KafkaService_1.name);
     async handlePortfolioIngested(payload) {
         this.logger.log(`Worker handling ingest event for tenant: ${payload.tenantId}`);
         try {
-            await drizzle_1.db.insert(drizzle_1.jobQueue).values({
+            await drizzle_1.db.insert(drizzle_1.taskQueue).values({
                 tenantId: payload.tenantId,
-                jobType: 'portfolio_ingest_recalc',
+                jobType: 'portfolio.ingest',
                 payload: payload,
                 status: 'pending',
                 runAfter: new Date(),
-                priority: 1
+                priority: 1,
             });
-            this.logger.log(`Job scheduled successfully in job_queue table for Tenant: ${payload.tenantId}`);
+            this.logger.log(`Job scheduled successfully in task_queue for Tenant: ${payload.tenantId}`);
         }
         catch (err) {
             this.logger.error('Failed to create portfolio job', err);

@@ -1,0 +1,70 @@
+import { journeySteps } from '@platform/drizzle';
+import { BaseRepository } from '@platform/drizzle/repository';
+export declare class JourneyStepsService extends BaseRepository<typeof journeySteps> {
+    constructor();
+    createStep(data: typeof journeySteps.$inferInsert): Promise<{
+        id: string;
+        createdBy: string | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+        channel: string | null;
+        journeyId: string;
+        stepOrder: number;
+        actionType: string;
+        templateId: string | null;
+        delayHours: number | null;
+        repeatIntervalDays: number | null;
+        scheduleCron: string | null;
+        conditionsJsonb: unknown;
+        providerOverride: unknown;
+    }[]>;
+    updateStep(id: string, data: Partial<typeof journeySteps.$inferInsert>): Promise<{
+        id: string;
+        journeyId: string;
+        stepOrder: number;
+        actionType: string;
+        channel: string | null;
+        templateId: string | null;
+        delayHours: number | null;
+        repeatIntervalDays: number | null;
+        scheduleCron: string | null;
+        conditionsJsonb: unknown;
+        providerOverride: unknown;
+        createdBy: string | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+    }[]>;
+    deleteStep(id: string): Promise<{
+        id: string;
+        createdBy: string | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+        channel: string | null;
+        journeyId: string;
+        stepOrder: number;
+        actionType: string;
+        templateId: string | null;
+        delayHours: number | null;
+        repeatIntervalDays: number | null;
+        scheduleCron: string | null;
+        conditionsJsonb: unknown;
+        providerOverride: unknown;
+    }[]>;
+    findByJourney(journeyId: string): Promise<{
+        id: string;
+        journeyId: string;
+        stepOrder: number;
+        actionType: string;
+        channel: string | null;
+        templateId: string | null;
+        delayHours: number | null;
+        repeatIntervalDays: number | null;
+        scheduleCron: string | null;
+        conditionsJsonb: unknown;
+        providerOverride: unknown;
+        createdBy: string | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+    }[]>;
+    reorder(journeyId: string, stepIds: string[]): Promise<void>;
+}

@@ -16,12 +16,12 @@ exports.DpdBucketConfigsController = void 0;
 const common_1 = require("@nestjs/common");
 const dpd_bucket_configs_service_1 = require("./dpd-bucket-configs.service");
 const create_bucket_dto_1 = require("./dto/create-bucket.dto");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
-const tenant_1 = require("../../../../tenant/index.ts");
+const tenant_1 = require("../../../../tenant");
 const drizzle_orm_1 = require("drizzle-orm");
-const drizzle_1 = require("../../../../drizzle/index.ts");
+const drizzle_1 = require("../../../../drizzle");
 let DpdBucketConfigsController = class DpdBucketConfigsController {
     bucketService;
     constructor(bucketService) {

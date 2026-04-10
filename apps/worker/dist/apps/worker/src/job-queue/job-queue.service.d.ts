@@ -1,13 +1,17 @@
-import { jobQueue } from '@platform/drizzle';
+import { taskQueue } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
-import { PortfoliosService, PortfolioRecordsService, WorkflowRulesService, EligibilityService } from '@platform/domain';
-export declare class JobQueueService extends BaseRepository<typeof jobQueue> {
+import { PortfoliosService, PortfolioRecordsService, SegmentationRunsService, TemplateRendererService, DeliveryLogsService } from '@platform/domain';
+export declare class JobQueueService extends BaseRepository<typeof taskQueue> {
     private readonly portfolioService;
     private readonly recordsService;
-    private readonly workflowService;
-    private readonly eligibilityService;
+    private readonly segmentationRunsService;
+    private readonly templateRenderer;
+    private readonly deliveryLogsService;
     private readonly logger;
-    constructor(portfolioService: PortfoliosService, recordsService: PortfolioRecordsService, workflowService: WorkflowRulesService, eligibilityService: EligibilityService);
+    constructor(portfolioService: PortfoliosService, recordsService: PortfolioRecordsService, segmentationRunsService: SegmentationRunsService, templateRenderer: TemplateRendererService, deliveryLogsService: DeliveryLogsService);
     processPendingJobs(): Promise<void>;
+    scheduleCommDispatch(): Promise<void>;
     handlePortfolioIngest(portfolioId: string, tenantId: string): Promise<void>;
+    handleSegmentationRun(tenantId: string): Promise<void>;
+    handleCommDispatch(tenantId: string, jobId: string): Promise<void>;
 }

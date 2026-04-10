@@ -15,9 +15,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportsController = void 0;
 const common_1 = require("@nestjs/common");
 const reports_service_1 = require("./reports.service");
-const common_2 = require("../../../../../libs/common/index.ts");
-const domain_1 = require("../../../../../libs/domain/src/index.ts");
-const tenant_1 = require("../../../../../libs/tenant/index.ts");
+const common_2 = require("../../../../../libs/common");
+const domain_1 = require("../../../../../libs/domain/src");
+const tenant_1 = require("../../../../../libs/tenant");
 let ReportsController = class ReportsController {
     reportsService;
     constructor(reportsService) {

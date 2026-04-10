@@ -11,10 +11,15 @@ const common_1 = require("@nestjs/common");
 const tenant_context_1 = require("./tenant.context");
 let TenantGuard = class TenantGuard {
     canActivate(context) {
-        const tenantId = tenant_context_1.TenantContext.tenantId;
+        const request = context.switchToHttp().getRequest();
+        let tenantId = tenant_context_1.TenantContext.tenantId;
+        if (!tenantId && request.user?.tenantId) {
+            tenantId = request.user.tenantId;
+        }
         if (!tenantId) {
             throw new common_1.UnauthorizedException('Tenant context is required');
         }
+        request.resolvedTenantId = tenantId;
         return true;
     }
 };

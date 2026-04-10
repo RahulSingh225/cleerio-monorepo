@@ -16,9 +16,10 @@ exports.TenantsController = void 0;
 const common_1 = require("@nestjs/common");
 const tenants_service_1 = require("./tenants.service");
 const create_tenant_dto_1 = require("./dto/create-tenant.dto");
-const common_2 = require("../../../../common/index.ts");
+const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
+const tenant_role_guard_1 = require("../auth/guards/tenant-role.guard");
 let TenantsController = class TenantsController {
     tenantsService;
     constructor(tenantsService) {
@@ -33,15 +34,18 @@ let TenantsController = class TenantsController {
     async findAll() {
         return this.tenantsService.findMany();
     }
+    async findById(id) {
+        return this.tenantsService.getTenantById(id);
+    }
+    async update(id, data) {
+        return this.tenantsService.updateTenant(id, data);
+    }
 };
 exports.TenantsController = TenantsController;
 __decorate([
     (0, common_1.Post)(),
     (0, roles_decorator_1.Roles)('platform_admin'),
-    (0, common_2.ApiResponseConfig)({
-        message: 'Tenant created successfully',
-        apiCode: 'TENANT_CREATED',
-    }),
+    (0, common_2.ApiResponseConfig)({ message: 'Tenant created successfully', apiCode: 'TENANT_CREATED' }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_tenant_dto_1.CreateTenantDto]),
@@ -49,10 +53,7 @@ __decorate([
 ], TenantsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(':code'),
-    (0, common_2.ApiResponseConfig)({
-        message: 'Tenant retrieved successfully',
-        apiCode: 'TENANT_RETRIEVED',
-    }),
+    (0, common_2.ApiResponseConfig)({ message: 'Tenant retrieved successfully', apiCode: 'TENANT_RETRIEVED' }),
     __param(0, (0, common_1.Param)('code')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -61,14 +62,30 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)('platform_admin', 'platform_ops'),
-    (0, common_2.ApiResponseConfig)({
-        message: 'Tenants listed successfully',
-        apiCode: 'TENANTS_LISTED',
-    }),
+    (0, common_2.ApiResponseConfig)({ message: 'Tenants listed successfully', apiCode: 'TENANTS_LISTED' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], TenantsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('by-id/:id'),
+    (0, common_2.ApiResponseConfig)({ message: 'Tenant retrieved by ID', apiCode: 'TENANT_BY_ID' }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], TenantsController.prototype, "findById", null);
+__decorate([
+    (0, common_1.Put)(':id'),
+    (0, common_1.UseGuards)(tenant_role_guard_1.TenantRoleGuard),
+    (0, roles_decorator_1.Roles)('platform_admin'),
+    (0, common_2.ApiResponseConfig)({ message: 'Tenant updated successfully', apiCode: 'TENANT_UPDATED' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], TenantsController.prototype, "update", null);
 exports.TenantsController = TenantsController = __decorate([
     (0, common_1.Controller)('tenants'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

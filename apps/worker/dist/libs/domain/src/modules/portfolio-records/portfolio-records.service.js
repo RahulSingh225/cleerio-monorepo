@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PortfolioRecordsService = void 0;
 const common_1 = require("@nestjs/common");
-const drizzle_1 = require("../../../../drizzle/index.ts");
-const repository_1 = require("@platform/drizzle/repository");
+const drizzle_1 = require("../../../../drizzle");
+const repository_1 = require("../../../../drizzle/repository");
 let PortfolioRecordsService = class PortfolioRecordsService extends repository_1.BaseRepository {
     constructor() {
         super(drizzle_1.portfolioRecords, drizzle_1.db);
@@ -24,7 +24,14 @@ let PortfolioRecordsService = class PortfolioRecordsService extends repository_1
         return undefined;
     }
     async insertBulkRecords(records) {
-        return this._db.insert(drizzle_1.portfolioRecords).values(records).returning();
+        const chunkSize = 500;
+        let results = [];
+        for (let i = 0; i < records.length; i += chunkSize) {
+            const chunk = records.slice(i, i + chunkSize);
+            const inserted = await this._db.insert(drizzle_1.portfolioRecords).values(chunk).returning();
+            results = results.concat(inserted);
+        }
+        return results;
     }
 };
 exports.PortfolioRecordsService = PortfolioRecordsService;

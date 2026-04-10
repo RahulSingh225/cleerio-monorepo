@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DpdBucketConfigsService = void 0;
 const common_1 = require("@nestjs/common");
-const drizzle_1 = require("../../../../drizzle/index.ts");
-const repository_1 = require("@platform/drizzle/repository");
+const drizzle_1 = require("../../../../drizzle");
+const repository_1 = require("../../../../drizzle/repository");
 let DpdBucketConfigsService = class DpdBucketConfigsService extends repository_1.BaseRepository {
     constructor() {
         super(drizzle_1.dpdBucketConfigs, drizzle_1.db);
