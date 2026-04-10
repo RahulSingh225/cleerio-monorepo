@@ -23,12 +23,6 @@ export * from './modules/comm-templates/comm-templates.module';
 export * from './modules/comm-templates/comm-templates.service';
 export * from './modules/comm-templates/template-renderer.service';
 
-export * from './modules/workflow-rules/workflow-rules.module';
-export * from './modules/workflow-rules/workflow-rules.service';
-export * from './modules/workflow-rules/eligibility.service';
-export * from './modules/workflow-rules/communication.service';
-export * from './modules/workflow-rules/providers/provider.interface';
-
 export * from './modules/portfolios/portfolios.module';
 export * from './modules/portfolios/portfolios.service';
 
@@ -38,26 +32,36 @@ export * from './modules/portfolio-records/portfolio-records.service';
 export * from './modules/jobs/jobs.module';
 export * from './modules/jobs/jobs.service';
 
-export * from './modules/repayment-syncs/repayment-syncs.module';
-export * from './modules/repayment-syncs/repayment-syncs.service';
-
 export * from './modules/opt-out/opt-out.module';
 export * from './modules/opt-out/opt-out.service';
 
 export * from './modules/comm-events/comm-events.module';
 export * from './modules/comm-events/comm-events.service';
 
-export * from './modules/batch-runs/batch-runs.module';
-export * from './modules/batch-runs/batch-runs.service';
-
 export * from './modules/delivery-logs/delivery-logs.module';
 export * from './modules/delivery-logs/delivery-logs.service';
-
-export * from './modules/scheduled-jobs/scheduled-jobs.module';
-export * from './modules/scheduled-jobs/scheduled-jobs.service';
 
 export * from './modules/audit-logs/audit-logs.module';
 export * from './modules/audit-logs/audit-logs.service';
 
 export * from './modules/report-jobs/report-jobs.module';
 export * from './modules/report-jobs/report-jobs.service';
+
+// ─── V2 NEW MODULES ─────────────────────────────────────────
+
+export * from './modules/segments/segments.module';
+export * from './modules/segments/segments.service';
+
+export * from './modules/segmentation-runs/segmentation-runs.module';
+export * from './modules/segmentation-runs/segmentation-runs.service';
+
+export * from './modules/journeys/journeys.module';
+export * from './modules/journeys/journeys.service';
+
+export * from './modules/journey-steps/journey-steps.service';
+
+export * from './modules/interaction-events/interaction-events.module';
+export * from './modules/interaction-events/interaction-events.service';
+
+export * from './modules/repayment/repayment.module';
+export * from './modules/repayment/repayment.service';

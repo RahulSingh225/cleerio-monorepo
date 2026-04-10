@@ -17,9 +17,8 @@ services:
     ports:
       - "6379:6379"
 
-  # Kafka with KRaft (No Zookeeper required in modern Kafka)
   kafka:
-    image: apache/kafka:latest
+    image: confluentinc/cp-kafka:latest
     container_name: collections-kafka
     ports:
       - "9092:9092"

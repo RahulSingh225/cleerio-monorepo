@@ -12,6 +12,7 @@ import {
   timestamp,
   date,
   AnyPgColumn,
+  inet,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -20,14 +21,15 @@ import { sql } from 'drizzle-orm';
 export const tenants = pgTable(
   'tenants',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     name: varchar('name', { length: 255 }).notNull(),
-    code: varchar('code', { length: 50 }).notNull().unique(), // short slug e.g. HDFC_NBFC
-    status: varchar('status', { length: 20 }).notNull().default('active'), // active | suspended | onboarding
-    settings: jsonb('settings').default({}), // whitelabel config, timezone, locale
-    createdBy: uuid('created_by'), // -> platform_users.id
+    code: varchar('code', { length: 50 }).notNull().unique(),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    settings: jsonb('settings').default({}),
+    createdBy: uuid('created_by'), // → platform_users.id
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => ({
     codeIdx: uniqueIndex('tenants_code_idx').on(t.code),
@@ -77,15 +79,15 @@ export const tenantUsers = pgTable(
 export const tenantFieldRegistry = pgTable(
   'tenant_field_registry',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
-    fieldKey: varchar('field_key', { length: 20 }).notNull(), // field1, field2
+    fieldKey: varchar('field_key', { length: 20 }).notNull(),
     fieldIndex: integer('field_index').notNull(),
     headerName: varchar('header_name', { length: 100 }).notNull(),
     displayLabel: varchar('display_label', { length: 100 }).notNull(),
-    dataType: varchar('data_type', { length: 20 }).notNull().default('string'), // string | number | date | boolean
+    dataType: varchar('data_type', { length: 20 }).default('string'),
     isCore: boolean('is_core').default(false),
     isPii: boolean('is_pii').default(false),
     sampleValue: varchar('sample_value', { length: 255 }),
@@ -104,58 +106,87 @@ export const tenantFieldRegistry = pgTable(
 export const portfolios = pgTable(
   'portfolios',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
-    allocationMonth: varchar('allocation_month', { length: 10 }).notNull(), // e.g. 2026_03
-    sourceType: varchar('source_type', { length: 20 }).notNull(), // csv | xlsx | api
-    status: varchar('status', { length: 20 }).notNull().default('pending'), // pending | processing | completed | failed
+    allocationMonth: varchar('allocation_month', { length: 10 }).notNull(),
+    sourceType: varchar('source_type', { length: 20 }).notNull(),
+    status: varchar('status', { length: 20 }).default('pending'),
     fileUrl: text('file_url'),
     totalRecords: integer('total_records').default(0),
     processedRecords: integer('processed_records').default(0),
     failedRecords: integer('failed_records').default(0),
     uploadedBy: uuid('uploaded_by').references(() => tenantUsers.id),
-    errorLog: jsonb('error_log').default([]), // array of row-level parse errors
+    errorLog: jsonb('error_log').default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => ({
+    tenantMonthStatusIdx: index('portfolios_tenant_month_status_idx').on(t.tenantId, t.allocationMonth, t.status),
+  })
+);
+
+// ─── DPD BUCKET CONFIGURATION ───────────────────────────────
+
+export const dpdBucketConfigs = pgTable(
+  'dpd_bucket_configs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    bucketName: varchar('bucket_name', { length: 50 }).notNull(),
+    dpdMin: integer('dpd_min').notNull(),
+    dpdMax: integer('dpd_max'),
+    displayLabel: varchar('display_label', { length: 100 }),
+    priority: integer('priority').default(0),
+    isActive: boolean('is_active').default(true),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
-    tenantIdIdx: index('portfolios_tenant_id_idx').on(t.tenantId),
-    tenantAllocMonthIdx: index('portfolios_tenant_alloc_month_idx').on(t.tenantId, t.allocationMonth),
-    statusIdx: index('portfolios_status_idx').on(t.status),
+    tenantIdIdx: index('dpd_bucket_configs_tenant_id_idx').on(t.tenantId),
+    tenantBucketNameIdx: uniqueIndex('dpd_bucket_configs_tenant_bucket_name_idx').on(t.tenantId, t.bucketName),
   })
 );
 
-// ── DPD BUCKET CONFIGURATION ────────────────────────────────
+// ─── SEGMENTS ────────────────────────────────────────────────
 
-export const dpdBucketConfigs = pgTable(
-    'dpd_bucket_configs',
-    {
-      id: uuid('id').primaryKey().defaultRandom(),
-      tenantId: uuid('tenant_id')
-        .notNull()
-        .references(() => tenants.id),
-      bucketName: varchar('bucket_name', { length: 50 }).notNull(),
-      dpdMin: integer('dpd_min').notNull(),
-      dpdMax: integer('dpd_max'),
-      displayLabel: varchar('display_label', { length: 100 }),
-      priority: integer('priority').default(0),
-      isActive: boolean('is_active').default(true),
-      createdBy: uuid('created_by').references(() => tenantUsers.id),
-      createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-      updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-    },
-    (t) => ({
-      tenantIdIdx: index('dpd_bucket_configs_tenant_id_idx').on(t.tenantId),
-      tenantBucketNameIdx: uniqueIndex('dpd_bucket_configs_tenant_bucket_name_idx').on(t.tenantId, t.bucketName),
-    })
+export const segments = pgTable(
+  'segments',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    code: varchar('code', { length: 50 }).notNull(),
+    description: text('description'),
+    isDefault: boolean('is_default').default(false),
+    isActive: boolean('is_active').default(true),
+    priority: integer('priority').default(100),
+    criteriaJsonb: jsonb('criteria_jsonb').notNull(), // rule engine criteria
+    successRate: numeric('success_rate', { precision: 5, scale: 2 }).default('0'),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('segments_tenant_id_idx').on(t.tenantId),
+    tenantActiveIdx: index('segments_tenant_active_priority_idx').on(t.tenantId, t.isActive, t.priority),
+    tenantDefaultIdx: index('segments_tenant_default_idx').on(t.tenantId, t.isDefault),
+  })
 );
+
+// ─── PORTFOLIO RECORDS ───────────────────────────────────────
 
 export const portfolioRecords = pgTable(
   'portfolio_records',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     portfolioId: uuid('portfolio_id')
       .notNull()
       .references(() => portfolios.id),
@@ -164,58 +195,90 @@ export const portfolioRecords = pgTable(
       .references(() => tenants.id),
 
     // Core identity & financial fields
-    userId: varchar('user_id', { length: 50 }).notNull(), // borrower ID from NBFC
+    userId: varchar('user_id', { length: 100 }).notNull(),
     mobile: varchar('mobile', { length: 15 }).notNull(),
     name: varchar('name', { length: 255 }),
     product: varchar('product', { length: 100 }),
     employerId: varchar('employer_id', { length: 50 }),
+    outstanding: numeric('outstanding', { precision: 14, scale: 2 }).default('0'),
     currentDpd: integer('current_dpd').default(0),
     dpdBucket: varchar('dpd_bucket', { length: 50 }), // resolved bucket name from configs
-    overdue: numeric('overdue', { precision: 14, scale: 2 }).default('0'),
-    outstanding: numeric('outstanding', { precision: 14, scale: 2 }).default('0'),
 
     // All upload columns stored as fieldN keys
     dynamicFields: jsonb('dynamic_fields').default({}),
 
+    // Segmentation
+    segmentId: uuid('segment_id').references(() => segments.id),
+    lastSegmentedAt: timestamp('last_segmented_at', { withTimezone: true }),
+
     // Record state
-    isOptedOut: boolean('is_opted_out').default(false), // DNC flag
-    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    isOptedOut: boolean('is_opted_out').default(false),
+    lastRepaymentAt: timestamp('last_repayment_at', { withTimezone: true }),
+    totalRepaid: numeric('total_repaid', { precision: 14, scale: 2 }).default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => ({
     tenantIdIdx: index('portfolio_records_tenant_id_idx').on(t.tenantId),
-    tenantUserIdIdx: index('portfolio_records_tenant_user_idx').on(t.tenantId, t.userId),
+    tenantUserIdIdx: uniqueIndex('portfolio_records_tenant_user_id_idx').on(t.tenantId, t.userId),
+    tenantMobileIdx: index('portfolio_records_tenant_mobile_idx').on(t.tenantId, t.mobile),
+    tenantSegmentIdx: index('portfolio_records_tenant_segment_idx').on(t.tenantId, t.segmentId),
     tenantDpdIdx: index('portfolio_records_tenant_dpd_idx').on(t.tenantId, t.currentDpd),
-    tenantBucketIdx: index('portfolio_records_tenant_bucket_idx').on(t.tenantId, t.dpdBucket),
-    mobileIdx: index('portfolio_records_mobile_idx').on(t.mobile),
+    tenantOutstandingIdx: index('portfolio_records_tenant_outstanding_idx').on(t.tenantId, t.outstanding),
     portfolioIdIdx: index('portfolio_records_portfolio_id_idx').on(t.portfolioId),
     dynamicFieldsGinIdx: index('portfolio_records_dynamic_fields_gin_idx').using('gin', t.dynamicFields),
   })
 );
 
-export const repaymentSyncs = pgTable(
-  'repayment_syncs',
+// ─── SEGMENTATION RUNS ──────────────────────────────────────
+
+export const segmentationRuns = pgTable(
+  'segmentation_runs',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
-    sourceType: varchar('source_type', { length: 20 }).notNull(), // csv | xlsx | api
-    fileUrl: text('file_url'),
-    status: varchar('status', { length: 20 }).notNull().default('pending'),
-    recordsUpdated: integer('records_updated').default(0),
-    uploadedBy: uuid('uploaded_by').references(() => tenantUsers.id),
-    syncDate: date('sync_date').notNull(),
+    portfolioId: uuid('portfolio_id').references(() => portfolios.id),
+    triggeredBy: uuid('triggered_by').references(() => tenantUsers.id),
+    status: varchar('status', { length: 20 }).default('pending'),
+    totalRecords: integer('total_records'),
+    processed: integer('processed').default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (t) => ({
-    tenantDateIdx: index('repayment_syncs_tenant_date_idx').on(t.tenantId, t.syncDate),
+    tenantPortfolioIdx: index('segmentation_runs_tenant_portfolio_idx').on(t.tenantId, t.portfolioId),
   })
 );
 
+// ─── JOURNEYS ────────────────────────────────────────────────
 
-// ─── CHANNEL CONFIGURATION ───────────────────────────────────
+export const journeys = pgTable(
+  'journeys',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => segments.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: text('description'),
+    isActive: boolean('is_active').default(true),
+    successMetric: varchar('success_metric', { length: 50 }).default('ptp_rate'),
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantSegmentIdx: index('journeys_tenant_segment_idx').on(t.tenantId, t.segmentId),
+  })
+);
+
+// ─── CHANNEL CONFIGURATION ──────────────────────────────────
 
 export const channelConfigs = pgTable(
   'channel_configs',
@@ -224,10 +287,10 @@ export const channelConfigs = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
-    channel: varchar('channel', { length: 20 }).notNull(), // sms | whatsapp | ivr | voice_bot
+    channel: varchar('channel', { length: 20 }).notNull(),
     isEnabled: boolean('is_enabled').default(false),
     providerName: varchar('provider_name', { length: 50 }),
-    providerConfig: jsonb('provider_config').default({}), // encrypted configs
+    providerConfig: jsonb('provider_config').default({}),
     dailyCap: integer('daily_cap'),
     hourlyCap: integer('hourly_cap'),
     updatedBy: uuid('updated_by').references(() => tenantUsers.id),
@@ -243,162 +306,50 @@ export const channelConfigs = pgTable(
 export const commTemplates = pgTable(
   'comm_templates',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
     name: varchar('name', { length: 100 }).notNull(),
     channel: varchar('channel', { length: 20 }).notNull(),
-    dpdBucket: varchar('dpd_bucket', { length: 50 }),
-    language: varchar('language', { length: 10 }).notNull().default('en'),
+    language: varchar('language', { length: 10 }).default('en'),
     body: text('body').notNull(),
     variables: jsonb('variables').default([]),
     mediaUrl: text('media_url'),
-    version: integer('version').notNull().default(1),
     isActive: boolean('is_active').default(true),
-    approvedAt: timestamp('approved_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => tenantUsers.id),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
-    tenantIdIdx: index('comm_templates_tenant_id_idx').on(t.tenantId),
-    tenantChannelBucketIdx: index('comm_templates_tenant_channel_bucket_idx').on(t.tenantId, t.channel, t.dpdBucket),
+    tenantChannelIdx: index('comm_templates_tenant_channel_idx').on(t.tenantId, t.channel),
   })
 );
 
-// ─── WORKFLOW RULES ──────────────────────────────────────────
+// ─── JOURNEY STEPS ──────────────────────────────────────────
 
-export const workflowRules = pgTable(
-  'workflow_rules',
+export const journeySteps = pgTable(
+  'journey_steps',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id')
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    journeyId: uuid('journey_id')
       .notNull()
-      .references(() => tenants.id),
-    bucketId: uuid('bucket_id')
-      .notNull()
-      .references(() => dpdBucketConfigs.id),
+      .references(() => journeys.id),
+    stepOrder: integer('step_order').notNull(),
+    actionType: varchar('action_type', { length: 30 }).notNull(), // send_sms | send_whatsapp | send_ivr | send_voice_bot | wait | condition_check | manual_review
+    channel: varchar('channel', { length: 20 }),
     templateId: uuid('template_id').references(() => commTemplates.id),
-    channel: varchar('channel', { length: 20 }).notNull(),
-    priority: integer('priority').notNull().default(1),
-    delayDays: integer('delay_days').default(0),
+    delayHours: integer('delay_hours').default(0),
     repeatIntervalDays: integer('repeat_interval_days'),
     scheduleCron: varchar('schedule_cron', { length: 50 }),
-    isActive: boolean('is_active').default(true),
+    conditionsJsonb: jsonb('conditions_jsonb').default({}),
+    providerOverride: jsonb('provider_override').default({}),
     createdBy: uuid('created_by').references(() => tenantUsers.id),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
-    tenantIdIdx: index('workflow_rules_tenant_id_idx').on(t.tenantId),
-    tenantBucketIdx: index('workflow_rules_tenant_bucket_idx').on(t.tenantId, t.bucketId),
-    tenantChannelIdx: index('workflow_rules_tenant_channel_idx').on(t.tenantId, t.channel),
-  })
-);
-
-// ─── QUEUE STATE ─────────────────────────────────────────────
-
-export const jobQueue = pgTable(
-  'job_queue',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id').references(() => tenants.id), // null for platform jobs
-    jobType: varchar('job_type', { length: 50 }).notNull(),
-    status: varchar('status', { length: 20 }).notNull().default('pending'),
-    payload: jsonb('payload').notNull(),
-    priority: integer('priority').default(5),
-    attempts: integer('attempts').default(0),
-    maxAttempts: integer('max_attempts').default(3),
-    claimedBy: varchar('claimed_by', { length: 100 }),
-    claimedAt: timestamp('claimed_at', { withTimezone: true }),
-    claimExpiresAt: timestamp('claim_expires_at', { withTimezone: true }),
-    runAfter: timestamp('run_after', { withTimezone: true }).defaultNow(),
-    result: jsonb('result'),
-    lastError: text('last_error'),
-    failedAt: timestamp('failed_at', { withTimezone: true }),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-    nextRetryAt: timestamp('next_retry_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  },
-  (t) => ({
-    statusRunAfterPriorityIdx: index('job_queue_status_runafter_priority_idx').on(t.status, t.runAfter, t.priority),
-    tenantJobTypeStatusIdx: index('job_queue_tenant_jobtype_status_idx').on(t.tenantId, t.jobType, t.status),
-    claimExpiresAtIdx: index('job_queue_claim_expires_at_idx').on(t.claimExpiresAt),
-  })
-);
-
-export const batchRuns = pgTable(
-  'batch_runs',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id),
-    jobId: uuid('job_id').references(() => jobQueue.id),
-    batchType: varchar('batch_type', { length: 30 }).notNull(),
-    sourceRef: uuid('source_ref'),
-    status: varchar('status', { length: 20 }).notNull().default('pending'),
-    totalRecords: integer('total_records').default(0),
-    processed: integer('processed').default(0),
-    succeeded: integer('succeeded').default(0),
-    failed: integer('failed').default(0),
-    skipped: integer('skipped').default(0),
-    startedAt: timestamp('started_at', { withTimezone: true }),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  },
-  (t) => ({
-    tenantBatchTypeStatusIdx: index('batch_runs_tenant_batchtype_status_idx').on(t.tenantId, t.batchType, t.status),
-    jobIdIdx: index('batch_runs_job_id_idx').on(t.jobId),
-    sourceRefIdx: index('batch_runs_source_ref_idx').on(t.sourceRef),
-  })
-);
-
-export const batchErrors = pgTable(
-  'batch_errors',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    batchRunId: uuid('batch_run_id')
-      .notNull()
-      .references(() => batchRuns.id),
-    tenantId: uuid('tenant_id')
-      .notNull()
-      .references(() => tenants.id),
-    rowIndex: integer('row_index'),
-    recordRef: varchar('record_ref', { length: 50 }),
-    errorCode: varchar('error_code', { length: 50 }),
-    errorMessage: text('error_message'),
-    rawData: jsonb('raw_data'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  },
-  (t) => ({
-    batchRunIdIdx: index('batch_errors_batch_run_id_idx').on(t.batchRunId),
-    tenantBatchRunIdIdx: index('batch_errors_tenant_batch_run_id_idx').on(t.tenantId, t.batchRunId),
-  })
-);
-
-export const scheduledJobs = pgTable(
-  'scheduled_jobs',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id').references(() => tenants.id),
-    jobType: varchar('job_type', { length: 50 }).notNull(),
-    cronExpression: varchar('cron_expression', { length: 50 }).notNull(),
-    payloadTemplate: jsonb('payload_template').default({}),
-    isActive: boolean('is_active').default(true),
-    lastRunAt: timestamp('last_run_at', { withTimezone: true }),
-    lastRunStatus: varchar('last_run_status', { length: 20 }),
-    lastJobId: uuid('last_job_id').references(() => jobQueue.id),
-    nextRunAt: timestamp('next_run_at', { withTimezone: true }).notNull(),
-    createdBy: uuid('created_by').references(() => tenantUsers.id),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  },
-  (t) => ({
-    isActiveNextRunAtIdx: index('scheduled_jobs_isactive_nextrunat_idx').on(t.isActive, t.nextRunAt),
-    tenantIdIdx: index('scheduled_jobs_tenant_id_idx').on(t.tenantId),
+    journeyStepOrderIdx: index('journey_steps_journey_step_order_idx').on(t.journeyId, t.stepOrder),
   })
 );
 
@@ -407,22 +358,20 @@ export const scheduledJobs = pgTable(
 export const commEvents = pgTable(
   'comm_events',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
     recordId: uuid('record_id')
       .notNull()
       .references(() => portfolioRecords.id),
-    ruleId: uuid('rule_id').references(() => workflowRules.id),
-    templateId: uuid('template_id').references(() => commTemplates.id),
-    jobId: uuid('job_id').references(() => jobQueue.id),
+    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id),
+    segmentId: uuid('segment_id').references(() => segments.id),
     channel: varchar('channel', { length: 20 }).notNull(),
-    status: varchar('status', { length: 20 }).notNull().default('scheduled'),
+    status: varchar('status', { length: 20 }).default('scheduled'),
     resolvedBody: text('resolved_body'),
     resolvedFields: jsonb('resolved_fields').default({}),
-    scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
-    queuedAt: timestamp('queued_at', { withTimezone: true }),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     sentAt: timestamp('sent_at', { withTimezone: true }),
     idempotencyKey: varchar('idempotency_key', { length: 150 }).notNull().unique(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -430,11 +379,13 @@ export const commEvents = pgTable(
   (t) => ({
     tenantIdIdx: index('comm_events_tenant_id_idx').on(t.tenantId),
     recordIdIdx: index('comm_events_record_id_idx').on(t.recordId),
-    tenantStatusIdx: index('comm_events_tenant_status_idx').on(t.tenantId, t.status),
-    tenantScheduledAtIdx: index('comm_events_tenant_scheduled_at_idx').on(t.tenantId, t.scheduledAt),
-    jobIdIdx: index('comm_events_job_id_idx').on(t.jobId),
+    tenantStatusScheduledIdx: index('comm_events_tenant_status_scheduled_idx').on(t.tenantId, t.status, t.scheduledAt),
+    idempotencyKeyIdx: uniqueIndex('comm_events_idempotency_key_idx').on(t.idempotencyKey),
+    journeyStepIdIdx: index('comm_events_journey_step_id_idx').on(t.journeyStepId),
   })
 );
+
+// ─── DELIVERY LOGS ──────────────────────────────────────────
 
 export const deliveryLogs = pgTable(
   'delivery_logs',
@@ -463,26 +414,141 @@ export const deliveryLogs = pgTable(
   })
 );
 
-// ─── OPT-OUT / DNC ───────────────────────────────────────────
+// ─── INTERACTION EVENTS ─────────────────────────────────────
 
-export const optOutList = pgTable(
-  'opt_out_list',
+export const interactionEvents = pgTable(
+  'interaction_events',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    tenantId: uuid('tenant_id').references(() => tenants.id), // null = global platform level DNC
-    mobile: varchar('mobile', { length: 15 }).notNull(),
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    recordId: uuid('record_id')
+      .notNull()
+      .references(() => portfolioRecords.id),
+    commEventId: uuid('comm_event_id').references(() => commEvents.id),
+    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id),
+    interactionType: varchar('interaction_type', { length: 50 }).notNull(), // ptp | dispute | callback_request | link_click | reply | opt_out
     channel: varchar('channel', { length: 20 }),
-    reason: varchar('reason', { length: 100 }),
-    source: varchar('source', { length: 30 }),
-    optedOutAt: timestamp('opted_out_at', { withTimezone: true }).defaultNow(),
+    details: jsonb('details').default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
-    tenantMobileIdx: index('opt_out_list_tenant_mobile_idx').on(t.tenantId, t.mobile),
-    mobileIdx: index('opt_out_list_mobile_idx').on(t.mobile),
+    tenantTypeRecordIdx: index('interaction_events_tenant_type_record_idx').on(
+      t.tenantId, t.interactionType, t.recordId, t.commEventId
+    ),
   })
 );
 
-// ─── REPORTS ─────────────────────────────────────────────────
+// ─── CONVERSATION TRANSCRIPTS ───────────────────────────────
+
+export const conversationTranscripts = pgTable(
+  'conversation_transcripts',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    interactionId: uuid('interaction_id')
+      .notNull()
+      .references(() => interactionEvents.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    recordId: uuid('record_id').references(() => portfolioRecords.id),
+    transcriptText: text('transcript_text'),
+    confidence: numeric('confidence', { precision: 4, scale: 2 }),
+    rawJson: jsonb('raw_json'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  }
+);
+
+// ─── CALL RECORDINGS ────────────────────────────────────────
+
+export const callRecordings = pgTable(
+  'call_recordings',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    interactionId: uuid('interaction_id').references(() => interactionEvents.id),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    recordId: uuid('record_id').references(() => portfolioRecords.id),
+    s3AudioUrl: text('s3_audio_url'),
+    durationSeconds: integer('duration_seconds'),
+    transcriptId: uuid('transcript_id').references(() => conversationTranscripts.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  }
+);
+
+// ─── REPAYMENT SYNCS ────────────────────────────────────────
+
+export const repaymentSyncs = pgTable(
+  'repayment_syncs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    sourceType: varchar('source_type', { length: 20 }).notNull(),
+    fileUrl: text('file_url'),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    recordsUpdated: integer('records_updated').default(0),
+    uploadedBy: uuid('uploaded_by').references(() => tenantUsers.id),
+    syncDate: date('sync_date').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantDateIdx: index('repayment_syncs_tenant_date_idx').on(t.tenantId, t.syncDate),
+  })
+);
+
+// ─── REPAYMENT RECORDS ──────────────────────────────────────
+
+export const repaymentRecords = pgTable(
+  'repayment_records',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    portfolioRecordId: uuid('portfolio_record_id')
+      .notNull()
+      .references(() => portfolioRecords.id),
+    repaymentSyncId: uuid('repayment_sync_id').references(() => repaymentSyncs.id),
+    paymentDate: date('payment_date').notNull(),
+    amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+    paymentType: varchar('payment_type', { length: 30 }),
+    reference: varchar('reference', { length: 100 }),
+    sourceRaw: jsonb('source_raw'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantDateRecordIdx: index('repayment_records_tenant_date_record_idx').on(
+      t.tenantId, t.paymentDate, t.portfolioRecordId
+    ),
+  })
+);
+
+// ─── TASK QUEUE ─────────────────────────────────────────────
+
+export const taskQueue = pgTable(
+  'task_queue',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id').references(() => tenants.id),
+    taskType: varchar('task_type', { length: 50 }).notNull(),
+    status: varchar('status', { length: 20 }).default('pending'),
+    payload: jsonb('payload').notNull(),
+    kafkaTopic: varchar('kafka_topic', { length: 100 }),
+    kafkaKey: varchar('kafka_key', { length: 100 }),
+    priority: integer('priority').default(5),
+    attempts: integer('attempts').default(0),
+    runAfter: timestamp('run_after', { withTimezone: true }).defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    result: jsonb('result'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  }
+);
+
+// ─── REPORT JOBS ────────────────────────────────────────────
 
 export const reportJobs = pgTable(
   'report_jobs',
@@ -491,7 +557,7 @@ export const reportJobs = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
-    jobId: uuid('job_id').references(() => jobQueue.id),
+    jobId: uuid('job_id').references(() => taskQueue.id),
     requestedBy: uuid('requested_by').references(() => tenantUsers.id),
     reportType: varchar('report_type', { length: 50 }).notNull(),
     filters: jsonb('filters').default({}),
@@ -508,7 +574,7 @@ export const reportJobs = pgTable(
   })
 );
 
-// ─── AUDIT LOG ───────────────────────────────────────────────
+// ─── AUDIT LOG ──────────────────────────────────────────────
 
 export const auditLogs = pgTable(
   'audit_logs',
@@ -516,13 +582,13 @@ export const auditLogs = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     tenantId: uuid('tenant_id').references(() => tenants.id),
     actorId: uuid('actor_id'),
-    actorType: varchar('actor_type', { length: 20 }), // tenant_user | platform_user | system | worker
+    actorType: varchar('actor_type', { length: 20 }),
     action: varchar('action', { length: 100 }).notNull(),
     entityType: varchar('entity_type', { length: 50 }),
     entityId: uuid('entity_id'),
     oldValue: jsonb('old_value'),
     newValue: jsonb('new_value'),
-    ipAddress: varchar('ip_address', { length: 45 }), // Using varchar for inet
+    ipAddress: varchar('ip_address', { length: 45 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
@@ -531,4 +597,42 @@ export const auditLogs = pgTable(
     entityTypeEntityIdIdx: index('audit_logs_entity_type_entity_id_idx').on(t.entityType, t.entityId),
     createdAtIdx: index('audit_logs_created_at_idx').on(t.createdAt),
   })
+);
+
+// ─── OPT-OUT / DNC ─────────────────────────────────────────
+
+export const optOutList = pgTable(
+  'opt_out_list',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').references(() => tenants.id),
+    mobile: varchar('mobile', { length: 15 }).notNull(),
+    channel: varchar('channel', { length: 20 }),
+    reason: varchar('reason', { length: 100 }),
+    source: varchar('source', { length: 30 }),
+    optedOutAt: timestamp('opted_out_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantMobileIdx: index('opt_out_list_tenant_mobile_idx').on(t.tenantId, t.mobile),
+    mobileIdx: index('opt_out_list_mobile_idx').on(t.mobile),
+  })
+);
+
+// ─── AI INSIGHTS ────────────────────────────────────────────
+
+export const aiInsights = pgTable(
+  'ai_insights',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    recordId: uuid('record_id').references(() => portfolioRecords.id),
+    segmentId: uuid('segment_id').references(() => segments.id),
+    insightType: varchar('insight_type', { length: 50 }),
+    content: jsonb('content').notNull(),
+    confidence: numeric('confidence', { precision: 4, scale: 2 }),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow(),
+    createdBy: varchar('created_by', { length: 30 }).default('ai_agent'),
+  }
 );

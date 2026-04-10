@@ -6,8 +6,6 @@ import {
   Node,
   NodeChange,
   addEdge,
-  onNodesChange,
-  onEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';

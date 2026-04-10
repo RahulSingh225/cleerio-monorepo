@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/page-header';
-import { Layers, MessageSquare, FileText, Database, ShieldOff, ChevronRight } from 'lucide-react';
+import { Layers, MessageSquare, FileText, Database, ShieldOff, ChevronRight, Users } from 'lucide-react';
 
 const settingsItems = [
   {
@@ -15,21 +15,21 @@ const settingsItems = [
   },
   {
     title: 'DPD Bucket Configuration',
-    description: 'Define risk tiers based on days past due for targeted collection strategies.',
+    description: 'Define risk tiers based on days past due for segmentation criteria.',
     href: '/settings/buckets',
     icon: Layers,
     color: 'bg-emerald-50 text-emerald-600',
   },
   {
     title: 'Channel Configuration',
-    description: 'Manage SMS, WhatsApp, IVR, and voice bot channels for outreach.',
+    description: 'Manage SMS, WhatsApp, IVR, and voice bot channels with provider API keys.',
     href: '/settings/channels',
     icon: MessageSquare,
     color: 'bg-blue-50 text-blue-600',
   },
   {
     title: 'Communication Templates',
-    description: 'Create and manage message templates for automated collection workflows.',
+    description: 'Create and manage message templates for automated journey steps.',
     href: '/settings/templates',
     icon: FileText,
     color: 'bg-violet-50 text-violet-600',
@@ -40,6 +40,13 @@ const settingsItems = [
     href: '/settings/opt-out',
     icon: ShieldOff,
     color: 'bg-red-50 text-red-600',
+  },
+  {
+    title: 'Tenant Users',
+    description: 'Manage team members, invite users, and assign roles.',
+    href: '/settings/users',
+    icon: Users,
+    color: 'bg-amber-50 text-amber-600',
   },
 ];
 

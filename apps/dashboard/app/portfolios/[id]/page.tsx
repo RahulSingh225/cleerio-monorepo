@@ -70,10 +70,10 @@ export default function PortfolioDetailPage() {
 
       {/* Summary metrics */}
       <div className="grid grid-cols-4 gap-4">
-        <MetricCard title="Total Records" value={totalRecords.toLocaleString()} icon={<Users className="w-5 h-5" />} trend="" />
-        <MetricCard title="Total Outstanding" value={`₹${(totalOutstanding / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} trend="" />
-        <MetricCard title="Total Overdue" value={`₹${(totalOverdue / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} trend="" />
-        <MetricCard title="DPD Buckets" value={Object.keys(bucketDist).length.toString()} icon={<Layers className="w-5 h-5" />} trend="" />
+        <MetricCard label="Total Records" value={totalRecords.toLocaleString()} icon={<Users className="w-5 h-5" />} />
+        <MetricCard label="Total Outstanding" value={`₹${(totalOutstanding / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
+        <MetricCard label="Total Overdue" value={`₹${(totalOverdue / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
+        <MetricCard label="DPD Buckets" value={Object.keys(bucketDist).length.toString()} icon={<Layers className="w-5 h-5" />} />
       </div>
 
       {/* Bucket distribution */}

@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Building2, Users, Plus, X, Save, Loader2, Shield, Eye, Edit, UserMinus,
-  CheckCircle, Database, Layers, MessageSquare, FileText, Workflow
+  CheckCircle, Database, Layers, MessageSquare, FileText, Route as WorkflowIcon
 } from 'lucide-react';
 
 export default function TenantDetailPage() {
@@ -50,7 +50,7 @@ export default function TenantDetailPage() {
         api.get('/dpd-bucket-configs', { headers }).catch(() => ({ data: { data: [] } })),
         api.get('/channel-configs', { headers }).catch(() => ({ data: { data: [] } })),
         api.get('/comm-templates', { headers }).catch(() => ({ data: { data: [] } })),
-        api.get('/workflow-rules', { headers }).catch(() => ({ data: { data: [] } })),
+        api.get('/journeys', { headers }).catch(() => ({ data: { data: [] } })),
       ]);
       setConfigStatus({
         fields: (fields.data.data || []).length,
@@ -81,7 +81,7 @@ export default function TenantDetailPage() {
     { label: 'DPD Buckets', count: configStatus.buckets, icon: Layers, color: 'text-emerald-600 bg-emerald-50' },
     { label: 'Channels', count: configStatus.channels, icon: MessageSquare, color: 'text-blue-600 bg-blue-50' },
     { label: 'Templates', count: configStatus.templates, icon: FileText, color: 'text-violet-600 bg-violet-50' },
-    { label: 'Workflow Rules', count: configStatus.workflows, icon: Workflow, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Journeys', count: configStatus.workflows, icon: WorkflowIcon, color: 'text-orange-600 bg-orange-50' },
   ];
 
   const roleColors: Record<string, string> = {
@@ -190,7 +190,7 @@ export default function TenantDetailPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3">
-                      <StatusBadge label={user.role?.replace('_', ' ')} variant={roleColors[user.role] || 'neutral'} />
+                      <StatusBadge label={user.role?.replace('_', ' ')} variant={(roleColors[user.role] || 'neutral') as any} />
                     </td>
                     <td className="px-5 py-3">
                       <StatusBadge label={user.status} variant={user.status === 'active' ? 'success' : 'neutral'} />

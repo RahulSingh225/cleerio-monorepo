@@ -133,7 +133,7 @@ export default function CommunicationsPage() {
                 <td className="px-5 py-3">
                   <StatusBadge
                     label={statusConfig[event.status]?.label || event.status}
-                    variant={statusConfig[event.status]?.variant || 'neutral'}
+                    variant={(statusConfig[event.status]?.variant || 'neutral') as any}
                   />
                 </td>
                 <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">

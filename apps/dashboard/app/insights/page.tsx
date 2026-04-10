@@ -4,17 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/page-header';
 import { MetricCard } from '@/components/ui/metric-card';
+import { CircularProgress } from '@/components/ui/circular-progress';
 import { StatusBadge } from '@/components/ui/status-badge';
 import Link from 'next/link';
 import {
-  Users, DollarSign, Layers, Radio, FileText, TrendingUp, BarChart3,
-  Loader2, ArrowUpRight, Briefcase, Workflow
+  Users, DollarSign, Target, Route, Radio, FileText, TrendingUp,
+  Loader2, ArrowUpRight, Briefcase, Zap,
 } from 'lucide-react';
 
 export default function InsightsPage() {
   const [summary, setSummary] = useState<any>(null);
   const [dpdDist, setDpdDist] = useState<any[]>([]);
   const [portfolios, setPortfolios] = useState<any[]>([]);
+  const [segments, setSegments] = useState<any[]>([]);
+  const [journeys, setJourneys] = useState<any[]>([]);
   const [commStats, setCommStats] = useState({ total: 0, scheduled: 0, sent: 0, failed: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,16 +25,20 @@ export default function InsightsPage() {
 
   const fetchData = async () => {
     try {
-      const [summaryRes, dpdRes, portfolioRes, commRes] = await Promise.all([
+      const [summaryRes, dpdRes, portfolioRes, commRes, segRes, journeyRes] = await Promise.all([
         api.get('/reports/portfolio-summary').catch(() => ({ data: { data: null } })),
         api.get('/reports/dpd-distribution').catch(() => ({ data: { data: [] } })),
         api.get('/portfolios').catch(() => ({ data: { data: [] } })),
         api.get('/comm-events').catch(() => ({ data: { data: [] } })),
+        api.get('/segments').catch(() => ({ data: { data: [] } })),
+        api.get('/journeys').catch(() => ({ data: { data: [] } })),
       ]);
 
       setSummary(summaryRes.data.data);
       setDpdDist(dpdRes.data.data || []);
       setPortfolios((portfolioRes.data.data || []).slice(0, 5));
+      setSegments(segRes.data.data || []);
+      setJourneys(journeyRes.data.data || []);
 
       const events = commRes.data.data || [];
       setCommStats({
@@ -52,7 +59,6 @@ export default function InsightsPage() {
     );
   }
 
-  // Max overdue for DPD chart bars
   const maxOverdue = Math.max(...dpdDist.map((d: any) => Number(d.totalOverdue || 0)), 1);
 
   return (
@@ -61,60 +67,43 @@ export default function InsightsPage() {
 
       {/* Top Metrics */}
       <div className="grid grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Records"
-          value={(summary?.totalRecords || 0).toLocaleString()}
-          icon={<Users className="w-5 h-5" />}
-          trend=""
-        />
-        <MetricCard
-          title="Total Outstanding"
-          value={`₹${((Number(summary?.totalOutstanding || 0)) / 100000).toFixed(1)}L`}
-          icon={<DollarSign className="w-5 h-5" />}
-          trend=""
-        />
-        <MetricCard
-          title="Total Overdue"
-          value={`₹${((Number(summary?.totalOverdue || 0)) / 100000).toFixed(1)}L`}
-          icon={<TrendingUp className="w-5 h-5" />}
-          trend=""
-        />
-        <MetricCard
-          title="Communications"
-          value={commStats.total.toLocaleString()}
-          icon={<Radio className="w-5 h-5" />}
-          trend=""
-        />
+        <MetricCard label="Total Records" value={(summary?.totalRecords || 0).toLocaleString()} icon={<Users className="w-5 h-5" />} />
+        <MetricCard label="Total Outstanding" value={`₹${((Number(summary?.totalOutstanding || 0)) / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
+        <MetricCard label="Active Segments" value={String(segments.filter(s => s.isActive).length)} icon={<Target className="w-5 h-5" />} />
+        <MetricCard label="Active Journeys" value={String(journeys.filter(j => j.isActive).length)} icon={<Route className="w-5 h-5" />} />
       </div>
 
-      {/* Row: DPD Distribution + Comms Summary */}
+      {/* Segment Performance + Comms */}
       <div className="grid grid-cols-2 gap-4">
-        {/* DPD Distribution */}
+        {/* Segment Performance */}
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">DPD Bucket Distribution</h3>
-            <Layers className="w-4 h-4 text-[var(--text-tertiary)]" />
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Segment Performance</h3>
+            <Link href="/segments" className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1">
+              View All <ArrowUpRight className="w-3 h-3" />
+            </Link>
           </div>
-          {dpdDist.length > 0 ? (
-            <div className="space-y-3">
-              {dpdDist.map((bucket: any, i: number) => {
-                const pct = Math.round((Number(bucket.totalOverdue || 0) / maxOverdue) * 100);
-                const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-orange-500', 'bg-red-500'];
-                return (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-[var(--text-primary)]">{bucket.bucket || 'Unknown'}</span>
-                      <span className="text-xs text-[var(--text-tertiary)]">{bucket.count} records • ₹{Number(bucket.totalOverdue || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="w-full h-2 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${colors[i % colors.length]}`} style={{ width: `${Math.max(pct, 3)}%` }} />
-                    </div>
+          {segments.length > 0 ? (
+            <div className="grid grid-cols-3 gap-4">
+              {segments.slice(0, 6).map((seg: any) => (
+                <Link key={seg.id} href={`/segments/${seg.id}`}>
+                  <div className="flex flex-col items-center p-3 rounded-xl hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer group">
+                    <CircularProgress
+                      value={Number(seg.successRate || 0)}
+                      size={52}
+                      strokeWidth={4}
+                      color={Number(seg.successRate || 0) > 50 ? '#10B981' : '#F59E0B'}
+                    />
+                    <p className="text-xs font-medium text-[var(--text-primary)] mt-2 text-center group-hover:text-[var(--primary)] truncate w-full">
+                      {seg.name}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-tertiary)]">{(seg.recordCount || 0).toLocaleString()} rec</p>
                   </div>
-                );
-              })}
+                </Link>
+              ))}
             </div>
           ) : (
-            <p className="text-sm text-[var(--text-tertiary)] text-center py-8">No DPD data yet. Upload a portfolio to see distribution.</p>
+            <p className="text-sm text-[var(--text-tertiary)] text-center py-8">No segments yet. <Link href="/segments/new" className="text-[var(--primary)] hover:underline">Create one</Link></p>
           )}
         </div>
 
@@ -152,36 +141,66 @@ export default function InsightsPage() {
         </div>
       </div>
 
-      {/* Recent Portfolios */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent Portfolios</h3>
-          <Link href="/portfolios" className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1">
-            View All <ArrowUpRight className="w-3 h-3" />
-          </Link>
-        </div>
-        {portfolios.length > 0 ? (
-          <div className="space-y-2">
-            {portfolios.map((p: any) => (
-              <Link key={p.id} href={`/portfolios/${p.id}`}>
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center">
-                      <FileText className="w-4 h-4" />
+      {/* DPD Distribution + Recent Portfolios */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">DPD Bucket Distribution</h3>
+            <TrendingUp className="w-4 h-4 text-[var(--text-tertiary)]" />
+          </div>
+          {dpdDist.length > 0 ? (
+            <div className="space-y-3">
+              {dpdDist.map((bucket: any, i: number) => {
+                const pct = Math.round((Number(bucket.totalOverdue || 0) / maxOverdue) * 100);
+                const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-orange-500', 'bg-red-500'];
+                return (
+                  <div key={i}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-[var(--text-primary)]">{bucket.bucket || 'Unknown'}</span>
+                      <span className="text-xs text-[var(--text-tertiary)]">{bucket.count} records • ₹{Number(bucket.totalOverdue || 0).toLocaleString()}</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)]">{p.name || `Portfolio ${p.id?.substring(0, 8)}`}</p>
-                      <p className="text-[10px] text-[var(--text-tertiary)]">{p.allocationMonth || '—'} • {p.recordCount || 0} records</p>
+                    <div className="w-full h-2 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${colors[i % colors.length]}`} style={{ width: `${Math.max(pct, 3)}%` }} />
                     </div>
                   </div>
-                  <StatusBadge label={p.status} variant={p.status === 'completed' ? 'success' : p.status === 'processing' ? 'warning' : 'neutral'} />
-                </div>
-              </Link>
-            ))}
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-tertiary)] text-center py-8">No DPD data yet.</p>
+          )}
+        </div>
+
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent Portfolios</h3>
+            <Link href="/portfolios" className="text-xs text-[var(--primary)] hover:underline flex items-center gap-1">
+              View All <ArrowUpRight className="w-3 h-3" />
+            </Link>
           </div>
-        ) : (
-          <p className="text-sm text-[var(--text-tertiary)] text-center py-6">No portfolios uploaded yet.</p>
-        )}
+          {portfolios.length > 0 ? (
+            <div className="space-y-2">
+              {portfolios.map((p: any) => (
+                <Link key={p.id} href={`/portfolios/${p.id}`}>
+                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--primary)]">{p.name || `Portfolio ${p.id?.substring(0, 8)}`}</p>
+                        <p className="text-[10px] text-[var(--text-tertiary)]">{p.allocationMonth || '—'} • {p.recordCount || p.totalRecords || 0} records</p>
+                      </div>
+                    </div>
+                    <StatusBadge label={p.status} variant={p.status === 'completed' ? 'success' : p.status === 'processing' ? 'warning' : 'neutral'} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-tertiary)] text-center py-6">No portfolios uploaded yet.</p>
+          )}
+        </div>
       </div>
     </div>
   );
