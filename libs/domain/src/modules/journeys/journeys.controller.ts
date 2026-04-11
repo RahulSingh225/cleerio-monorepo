@@ -6,7 +6,7 @@ import { TenantRoleGuard } from '../auth/guards/tenant-role.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { TenantContext } from '@platform/tenant';
 
-@Controller('v1/journeys')
+@Controller('journeys')
 @UseGuards(JwtAuthGuard, TenantRoleGuard)
 export class JourneysController {
   constructor(

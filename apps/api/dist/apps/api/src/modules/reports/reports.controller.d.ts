@@ -9,9 +9,9 @@ export declare class ReportsController {
         activeBorrowers: number;
         portfolioId: string;
     }>;
-    getDpdDist(req: any): Promise<{
-        bucket: string | null;
+    getSegmentDist(req: any): Promise<{
+        segmentId: string | null;
         count: number;
-        totalOverdue: string | null;
+        totalOutstanding: string | null;
     }[]>;
 }

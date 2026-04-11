@@ -26,11 +26,11 @@ export default function PortfolioDetailPage() {
     try {
       const [pRes, rRes] = await Promise.all([
         api.get(`/portfolios/${portfolioId}`),
-        api.get(`/portfolio-records?portfolioId=${portfolioId}`).catch(() => ({ data: { data: [] } })),
+        api.get(`/portfolio-records/portfolio/${portfolioId}`).catch(() => ({ data: { data: [] } })),
       ]);
       setPortfolio(pRes.data.data);
       setRecords(rRes.data.data || []);
-    } catch (err) { console.error('Failed to load portfolio'); }
+    } catch (err) { console.error('Failed to load portfolio', err); }
     finally { setIsLoading(false); }
   };
 
@@ -39,10 +39,10 @@ export default function PortfolioDetailPage() {
   // Compute summary stats
   const totalRecords = records.length;
   const totalOutstanding = records.reduce((sum, r) => sum + Number(r.outstanding || 0), 0);
-  const totalOverdue = records.reduce((sum, r) => sum + Number(r.overdue || 0), 0);
-  const bucketDist = records.reduce((acc: Record<string, number>, r) => {
-    const b = r.dpdBucket || 'Unknown';
-    acc[b] = (acc[b] || 0) + 1;
+  const totalRepaid = records.reduce((sum, r) => sum + Number(r.totalRepaid || 0), 0);
+  const segmentDist = records.reduce((acc: Record<string, number>, r) => {
+    const s = r.segmentId ? r.segmentId.substring(0, 8) : 'Unassigned';
+    acc[s] = (acc[s] || 0) + 1;
     return acc;
   }, {});
 
@@ -72,17 +72,17 @@ export default function PortfolioDetailPage() {
       <div className="grid grid-cols-4 gap-4">
         <MetricCard label="Total Records" value={totalRecords.toLocaleString()} icon={<Users className="w-5 h-5" />} />
         <MetricCard label="Total Outstanding" value={`₹${(totalOutstanding / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
-        <MetricCard label="Total Overdue" value={`₹${(totalOverdue / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
-        <MetricCard label="DPD Buckets" value={Object.keys(bucketDist).length.toString()} icon={<Layers className="w-5 h-5" />} />
+        <MetricCard label="Total Repaid" value={`₹${(totalRepaid / 100000).toFixed(1)}L`} icon={<DollarSign className="w-5 h-5" />} />
+        <MetricCard label="Segments" value={Object.keys(segmentDist).length.toString()} icon={<Layers className="w-5 h-5" />} />
       </div>
 
-      {/* Bucket distribution */}
+      {/* Segment distribution */}
       <div className="card p-5">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">DPD Bucket Distribution</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Segment Distribution</h3>
         <div className="flex gap-2 flex-wrap">
-          {Object.entries(bucketDist).sort().map(([bucket, count]) => (
-            <div key={bucket} className="flex items-center gap-2 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-light)] rounded-lg">
-              <span className="text-xs font-bold text-[var(--text-primary)]">{bucket}</span>
+          {Object.entries(segmentDist).sort().map(([segment, count]) => (
+            <div key={segment} className="flex items-center gap-2 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-light)] rounded-lg">
+              <span className="text-xs font-bold text-[var(--text-primary)]">{segment}</span>
               <span className="text-xs text-[var(--text-tertiary)]">({count as number} records)</span>
             </div>
           ))}
@@ -107,9 +107,9 @@ export default function PortfolioDetailPage() {
               <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Name</th>
               <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Mobile</th>
               <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">DPD</th>
-              <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Bucket</th>
+              <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Product</th>
               <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Outstanding</th>
-              <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Overdue</th>
+              <th className="px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Repaid</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-light)]">
@@ -123,9 +123,9 @@ export default function PortfolioDetailPage() {
                     {rec.currentDpd ?? '—'}
                   </span>
                 </td>
-                <td className="px-4 py-2.5"><StatusBadge label={rec.dpdBucket || '—'} variant="info" /></td>
+                <td className="px-4 py-2.5 text-sm text-[var(--text-secondary)]">{rec.product || '—'}</td>
                 <td className="px-4 py-2.5 text-sm text-[var(--text-primary)] font-mono">₹{Number(rec.outstanding || 0).toLocaleString()}</td>
-                <td className="px-4 py-2.5 text-sm text-red-500 font-mono">₹{Number(rec.overdue || 0).toLocaleString()}</td>
+                <td className="px-4 py-2.5 text-sm text-emerald-600 font-mono">₹{Number(rec.totalRepaid || 0).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
@@ -145,3 +145,4 @@ export default function PortfolioDetailPage() {
     </div>
   );
 }
+

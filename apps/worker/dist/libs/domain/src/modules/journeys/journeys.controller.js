@@ -155,7 +155,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], JourneysController.prototype, "deploy", null);
 exports.JourneysController = JourneysController = __decorate([
-    (0, common_1.Controller)('v1/journeys'),
+    (0, common_1.Controller)('journeys'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_role_guard_1.TenantRoleGuard),
     __metadata("design:paramtypes", [journeys_service_1.JourneysService,
         journey_steps_service_1.JourneyStepsService])

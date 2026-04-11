@@ -20,6 +20,8 @@ const common_2 = require("../../../../common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const tenant_1 = require("../../../../tenant");
+const drizzle_1 = require("../../../../drizzle");
+const drizzle_orm_1 = require("drizzle-orm");
 let TenantFieldRegistryController = class TenantFieldRegistryController {
     registryService;
     constructor(registryService) {
@@ -30,6 +32,58 @@ let TenantFieldRegistryController = class TenantFieldRegistryController {
     }
     async getMapping() {
         return this.registryService.getMappingForTenant();
+    }
+    async getProfiles() {
+        const tenantId = tenant_1.TenantContext.tenantId;
+        return drizzle_1.db
+            .select()
+            .from(drizzle_1.portfolioMappingProfiles)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioMappingProfiles.tenantId, tenantId))
+            .orderBy(drizzle_1.portfolioMappingProfiles.createdAt)
+            .execute();
+    }
+    async getProfile(id) {
+        const [profile] = await drizzle_1.db
+            .select()
+            .from(drizzle_1.portfolioMappingProfiles)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioMappingProfiles.id, id))
+            .limit(1)
+            .execute();
+        return profile || null;
+    }
+    async createProfile(body) {
+        const tenantId = tenant_1.TenantContext.tenantId;
+        const [profile] = await drizzle_1.db
+            .insert(drizzle_1.portfolioMappingProfiles)
+            .values({
+            tenantId: tenantId,
+            name: body.name,
+            description: body.description || null,
+            mappings: body.mappings,
+            headers: body.headers,
+            fieldCount: Object.keys(body.mappings).length,
+        })
+            .returning();
+        return profile;
+    }
+    async updateProfile(id, body) {
+        const updateData = { updatedAt: new Date() };
+        if (body.name)
+            updateData.name = body.name;
+        if (body.description !== undefined)
+            updateData.description = body.description;
+        if (body.mappings) {
+            updateData.mappings = body.mappings;
+            updateData.fieldCount = Object.keys(body.mappings).length;
+        }
+        if (body.headers)
+            updateData.headers = body.headers;
+        const [updated] = await drizzle_1.db
+            .update(drizzle_1.portfolioMappingProfiles)
+            .set(updateData)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioMappingProfiles.id, id))
+            .returning();
+        return updated;
     }
 };
 exports.TenantFieldRegistryController = TenantFieldRegistryController;
@@ -55,6 +109,52 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], TenantFieldRegistryController.prototype, "getMapping", null);
+__decorate([
+    (0, common_1.Get)('profiles'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Mapping profiles retrieved',
+        apiCode: 'MAPPING_PROFILES_RETRIEVED',
+    }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], TenantFieldRegistryController.prototype, "getProfiles", null);
+__decorate([
+    (0, common_1.Get)('profiles/:id'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Mapping profile retrieved',
+        apiCode: 'MAPPING_PROFILE_RETRIEVED',
+    }),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], TenantFieldRegistryController.prototype, "getProfile", null);
+__decorate([
+    (0, common_1.Post)('profiles'),
+    (0, roles_decorator_1.Roles)('tenant_admin', 'ops'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Mapping profile created',
+        apiCode: 'MAPPING_PROFILE_CREATED',
+    }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], TenantFieldRegistryController.prototype, "createProfile", null);
+__decorate([
+    (0, common_1.Put)('profiles/:id'),
+    (0, roles_decorator_1.Roles)('tenant_admin', 'ops'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Mapping profile updated',
+        apiCode: 'MAPPING_PROFILE_UPDATED',
+    }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], TenantFieldRegistryController.prototype, "updateProfile", null);
 exports.TenantFieldRegistryController = TenantFieldRegistryController = __decorate([
     (0, common_1.Controller)('tenant-field-registry'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_1.TenantGuard),

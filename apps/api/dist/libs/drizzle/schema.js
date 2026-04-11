@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aiInsights = exports.optOutList = exports.auditLogs = exports.reportJobs = exports.taskQueue = exports.repaymentRecords = exports.repaymentSyncs = exports.callRecordings = exports.conversationTranscripts = exports.interactionEvents = exports.deliveryLogs = exports.commEvents = exports.journeySteps = exports.commTemplates = exports.channelConfigs = exports.journeys = exports.segmentationRuns = exports.portfolioRecords = exports.segments = exports.dpdBucketConfigs = exports.portfolios = exports.tenantFieldRegistry = exports.tenantUsers = exports.platformUsers = exports.tenants = exports.genUlidFunction = void 0;
+exports.aiInsights = exports.optOutList = exports.auditLogs = exports.reportJobs = exports.taskQueue = exports.repaymentRecords = exports.repaymentSyncs = exports.callRecordings = exports.conversationTranscripts = exports.interactionEvents = exports.deliveryLogs = exports.commEvents = exports.journeySteps = exports.commTemplates = exports.channelConfigs = exports.journeys = exports.segmentationRuns = exports.portfolioRecords = exports.segments = exports.dpdBucketConfigs = exports.portfolios = exports.portfolioMappingProfiles = exports.tenantFieldRegistry = exports.tenantUsers = exports.platformUsers = exports.tenants = exports.genUlidFunction = void 0;
 const pg_core_1 = require("drizzle-orm/pg-core");
 const drizzle_orm_1 = require("drizzle-orm");
 exports.genUlidFunction = (0, drizzle_orm_1.sql) `
@@ -92,11 +92,29 @@ exports.tenantFieldRegistry = (0, pg_core_1.pgTable)('tenant_field_registry', {
     tenantHeaderIdx: (0, pg_core_1.uniqueIndex)('tenant_field_registry_tenant_header_idx').on(t.tenantId, t.headerName),
     tenantIdIdx: (0, pg_core_1.index)('tenant_field_registry_tenant_id_idx').on(t.tenantId),
 }));
+exports.portfolioMappingProfiles = (0, pg_core_1.pgTable)('portfolio_mapping_profiles', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().default((0, drizzle_orm_1.sql) `gen_ulid()`),
+    tenantId: (0, pg_core_1.uuid)('tenant_id')
+        .notNull()
+        .references(() => exports.tenants.id),
+    name: (0, pg_core_1.varchar)('name', { length: 100 }).notNull(),
+    description: (0, pg_core_1.text)('description'),
+    mappings: (0, pg_core_1.jsonb)('mappings').notNull().default({}),
+    headers: (0, pg_core_1.jsonb)('headers').notNull().default([]),
+    fieldCount: (0, pg_core_1.integer)('field_count').default(0),
+    isDefault: (0, pg_core_1.boolean)('is_default').default(false),
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true }).defaultNow(),
+}, (t) => ({
+    tenantIdIdx: (0, pg_core_1.index)('portfolio_mapping_profiles_tenant_id_idx').on(t.tenantId),
+    tenantNameIdx: (0, pg_core_1.uniqueIndex)('portfolio_mapping_profiles_tenant_name_idx').on(t.tenantId, t.name),
+}));
 exports.portfolios = (0, pg_core_1.pgTable)('portfolios', {
     id: (0, pg_core_1.uuid)('id').primaryKey().default((0, drizzle_orm_1.sql) `gen_ulid()`),
     tenantId: (0, pg_core_1.uuid)('tenant_id')
         .notNull()
         .references(() => exports.tenants.id),
+    mappingProfileId: (0, pg_core_1.uuid)('mapping_profile_id').references(() => exports.portfolioMappingProfiles.id),
     allocationMonth: (0, pg_core_1.varchar)('allocation_month', { length: 10 }).notNull(),
     sourceType: (0, pg_core_1.varchar)('source_type', { length: 20 }).notNull(),
     status: (0, pg_core_1.varchar)('status', { length: 20 }).default('pending'),
@@ -166,7 +184,6 @@ exports.portfolioRecords = (0, pg_core_1.pgTable)('portfolio_records', {
     employerId: (0, pg_core_1.varchar)('employer_id', { length: 50 }),
     outstanding: (0, pg_core_1.numeric)('outstanding', { precision: 14, scale: 2 }).default('0'),
     currentDpd: (0, pg_core_1.integer)('current_dpd').default(0),
-    dpdBucket: (0, pg_core_1.varchar)('dpd_bucket', { length: 50 }),
     dynamicFields: (0, pg_core_1.jsonb)('dynamic_fields').default({}),
     segmentId: (0, pg_core_1.uuid)('segment_id').references(() => exports.segments.id),
     lastSegmentedAt: (0, pg_core_1.timestamp)('last_segmented_at', { withTimezone: true }),

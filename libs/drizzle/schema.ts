@@ -132,6 +132,30 @@ export const tenantFieldRegistry = pgTable(
   })
 );
 
+// ─── PORTFOLIO MAPPING PROFILES ─────────────────────────────
+
+export const portfolioMappingProfiles = pgTable(
+  'portfolio_mapping_profiles',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: text('description'),
+    mappings: jsonb('mappings').notNull().default({}), // { "CSV Header": "userId" | "mobile" | "field1", ... }
+    headers: jsonb('headers').notNull().default([]),    // Original CSV header order
+    fieldCount: integer('field_count').default(0),
+    isDefault: boolean('is_default').default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('portfolio_mapping_profiles_tenant_id_idx').on(t.tenantId),
+    tenantNameIdx: uniqueIndex('portfolio_mapping_profiles_tenant_name_idx').on(t.tenantId, t.name),
+  })
+);
+
 // ─── PORTFOLIO MANAGEMENT ────────────────────────────────────
 
 export const portfolios = pgTable(
@@ -141,6 +165,7 @@ export const portfolios = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
+    mappingProfileId: uuid('mapping_profile_id').references(() => portfolioMappingProfiles.id),
     allocationMonth: varchar('allocation_month', { length: 10 }).notNull(),
     sourceType: varchar('source_type', { length: 20 }).notNull(),
     status: varchar('status', { length: 20 }).default('pending'),
@@ -233,7 +258,6 @@ export const portfolioRecords = pgTable(
     employerId: varchar('employer_id', { length: 50 }),
     outstanding: numeric('outstanding', { precision: 14, scale: 2 }).default('0'),
     currentDpd: integer('current_dpd').default(0),
-    dpdBucket: varchar('dpd_bucket', { length: 50 }), // resolved bucket name from configs
 
     // All upload columns stored as fieldN keys
     dynamicFields: jsonb('dynamic_fields').default({}),

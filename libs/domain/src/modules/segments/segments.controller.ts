@@ -4,8 +4,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantRoleGuard } from '../auth/guards/tenant-role.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { TenantContext } from '@platform/tenant';
+import { db, taskQueue } from '@platform/drizzle';
 
-@Controller('v1/segments')
+@Controller('segments')
 @UseGuards(JwtAuthGuard, TenantRoleGuard)
 export class SegmentsController {
   constructor(private readonly segmentsService: SegmentsService) {}
@@ -19,6 +20,21 @@ export class SegmentsController {
       tenantId,
     });
     return { data: segment };
+  }
+
+  @Post('run')
+  @Roles('tenant_admin', 'ops')
+  async runSegmentation() {
+    const tenantId = TenantContext.tenantId;
+    await db.insert(taskQueue).values({
+      tenantId,
+      jobType: 'segmentation.run',
+      status: 'pending',
+      payload: { tenantId },
+      priority: 1,
+      runAfter: new Date(),
+    });
+    return { data: { status: 'queued', message: 'Segmentation run has been queued.' } };
   }
 
   @Get()

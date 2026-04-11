@@ -7,9 +7,9 @@ export declare class ReportsService {
         activeBorrowers: number;
         portfolioId: string;
     }>;
-    getDpdDistribution(tenantId: string): Promise<{
-        bucket: string | null;
+    getSegmentDistribution(tenantId: string): Promise<{
+        segmentId: string | null;
         count: number;
-        totalOverdue: string | null;
+        totalOutstanding: string | null;
     }[]>;
 }

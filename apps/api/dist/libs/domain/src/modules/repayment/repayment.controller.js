@@ -67,7 +67,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], RepaymentController.prototype, "findRecords", null);
 exports.RepaymentController = RepaymentController = __decorate([
-    (0, common_1.Controller)('v1/repayment-syncs'),
+    (0, common_1.Controller)('repayment-syncs'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_role_guard_1.TenantRoleGuard),
     __metadata("design:paramtypes", [repayment_service_1.RepaymentService])
 ], RepaymentController);

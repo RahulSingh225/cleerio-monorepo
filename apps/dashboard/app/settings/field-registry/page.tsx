@@ -19,7 +19,7 @@ export default function FieldRegistryPage() {
 
   const fetchFields = async () => {
     try {
-      const res = await api.get('/tenant-field-registry');
+      const res = await api.get('/tenant-field-registry/mapping');
       setFields(res.data.data || []);
     } catch (err) { console.error('Failed to fetch fields'); }
     finally { setIsLoading(false); }
@@ -30,7 +30,7 @@ export default function FieldRegistryPage() {
     setIsSubmitting(true);
     try {
       const nextIndex = fields.length;
-      await api.post('/tenant-field-registry', {
+      await api.post('/tenant-field-registry/mapping', {
         ...newField,
         fieldKey: `field${nextIndex + 1}`,
         fieldIndex: nextIndex,

@@ -4,8 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "concurrently \"npx pnpm --prefix apps/api dev\" \"npx pnpm --prefix apps/worker dev\" \"npx pnpm --prefix apps/dashboard dev\""
+    "build": "concurrently \"npm:build:api\" \"npm:build:worker\" \"npm:build:dashboard\"",
+    "build:api": "npx pnpm --prefix apps/api build",
+    "build:worker": "npx pnpm --prefix apps/worker build",
+    "build:dashboard": "npx pnpm --prefix apps/dashboard build",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:dashboard\"",
+    "dev:api": "npx pnpm --prefix apps/api dev",
+    "dev:worker": "npx pnpm --prefix apps/worker dev",
+    "dev:dashboard": "npx pnpm --prefix apps/dashboard dev",
+    "typecheck": "npx -p typescript tsc --noEmit",
+    "typecheck:api": "npx pnpm --prefix apps/api exec tsc --noEmit",
+    "lint": "npx pnpm -r lint"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +39,7 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "typescript": "^5.7.3",
     "@types/express": "^5.0.6",
     "@types/pg": "^8.20.0",
     "concurrently": "^9.2.1",

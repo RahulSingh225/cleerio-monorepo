@@ -7,20 +7,47 @@ import { CircularProgress } from '@/components/ui/circular-progress';
 import { RulePreview } from '@/components/ui/rule-preview';
 import { EmptyState } from '@/components/ui/empty-state';
 import Link from 'next/link';
-import { Target, Plus, Loader2, MoreVertical, Users, Zap, ToggleLeft, ToggleRight, Trash2, Copy } from 'lucide-react';
+import { Target, Plus, Loader2, Users, AlertTriangle, CheckCircle2, BarChart3, RefreshCw } from 'lucide-react';
 
 export default function SegmentsPage() {
   const [segments, setSegments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalPortfolioRecords, setTotalPortfolioRecords] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
 
   useEffect(() => { fetchSegments(); }, []);
 
   const fetchSegments = async () => {
     try {
-      const res = await api.get('/segments');
-      setSegments(res.data.data || []);
-    } catch (err) { console.error('Failed to load segments'); }
-    finally { setIsLoading(false); }
+      const segRes = await api.get('/segments');
+      setSegments(segRes.data.data || []);
+
+      try {
+        const countRes = await api.get('/portfolio-records/count');
+        // Handle both wrapped and unwrapped counts safely
+        const count = countRes.data?.data?.count ?? countRes.data?.count ?? 0;
+        setTotalPortfolioRecords(count);
+      } catch (err) {
+        console.warn('Failed to load record stats, continuing with segments...');
+        setTotalPortfolioRecords(0);
+      }
+    } catch (err: any) { 
+      console.error('CRITICAL: Failed to load segments list:', err.response?.data || err.message); 
+    } finally { 
+      setIsLoading(false); 
+    }
+  };
+
+  const triggerSegmentation = async () => {
+    setIsRunning(true);
+    try {
+      await api.post('/segments/run');
+      // Refetch after a short delay to see updated counts
+      setTimeout(() => { fetchSegments(); setIsRunning(false); }, 3000);
+    } catch (err) {
+      alert('Failed to trigger segmentation run.');
+      setIsRunning(false);
+    }
   };
 
   const toggleActive = async (id: string, currentActive: boolean) => {
@@ -30,7 +57,8 @@ export default function SegmentsPage() {
     } catch (err) { alert('Failed to toggle segment.'); }
   };
 
-  const totalRecords = segments.reduce((sum, s) => sum + (s.recordCount || 0), 0);
+  const assignedRecords = segments.reduce((sum, s) => sum + (s.recordCount || 0), 0);
+  const unassignedRecords = Math.max(0, totalPortfolioRecords - assignedRecords);
   const avgSuccess = segments.length > 0
     ? segments.reduce((sum, s) => sum + Number(s.successRate || 0), 0) / segments.length
     : 0;
@@ -49,16 +77,26 @@ export default function SegmentsPage() {
         title="Segments"
         subtitle="Define targeting criteria to group borrowers for automated journeys."
         actions={
-          <Link href="/segments/new">
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm">
-              <Plus className="w-4 h-4" /> Create Segment
+          <div className="flex items-center gap-2">
+            <button
+              onClick={triggerSegmentation}
+              disabled={isRunning}
+              className="flex items-center gap-2 px-4 py-2.5 border border-[var(--border)] text-[var(--text-primary)] rounded-lg text-sm font-medium hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRunning ? 'animate-spin' : ''}`} />
+              {isRunning ? 'Running...' : 'Run Segmentation'}
             </button>
-          </Link>
+            <Link href="/segments/new">
+              <button className="flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm">
+                <Plus className="w-4 h-4" /> Create Segment
+              </button>
+            </Link>
+          </div>
         }
       />
 
-      {/* Metrics */}
-      <div className="grid grid-cols-4 gap-4">
+      {/* Metrics with coverage indicator */}
+      <div className="grid grid-cols-5 gap-4">
         <div className="card p-4">
           <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Total Segments</p>
           <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{segments.length}</p>
@@ -68,14 +106,95 @@ export default function SegmentsPage() {
           <p className="text-2xl font-bold text-emerald-600 mt-1">{segments.filter(s => s.isActive).length}</p>
         </div>
         <div className="card p-4">
-          <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Total Records</p>
-          <p className="text-2xl font-bold text-[var(--text-primary)] mt-1">{totalRecords.toLocaleString()}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Assigned</p>
+            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+          </div>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{assignedRecords.toLocaleString()}</p>
+        </div>
+        <div className="card p-4 relative overflow-hidden">
+          <div className="flex items-center gap-1.5">
+            <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Unassigned</p>
+            {unassignedRecords > 0 && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+          </div>
+          <p className={`text-2xl font-bold mt-1 ${unassignedRecords > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+            {unassignedRecords.toLocaleString()}
+          </p>
+          {/* Pulse indicator for unassigned */}
+          {unassignedRecords > 0 && (
+            <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-400 rounded-full animate-pulse" />
+          )}
         </div>
         <div className="card p-4">
-          <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Avg Success Rate</p>
+          <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Avg Success</p>
           <p className="text-2xl font-bold text-[var(--primary)] mt-1">{avgSuccess.toFixed(1)}%</p>
         </div>
       </div>
+
+      {/* Coverage Bar — visual indicator of segment coverage */}
+      {totalPortfolioRecords > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[var(--text-tertiary)]" />
+              <span className="text-xs font-semibold text-[var(--text-primary)]">
+                Segment Coverage
+              </span>
+            </div>
+            <span className="text-xs font-medium text-[var(--text-secondary)]">
+              {assignedRecords.toLocaleString()} / {totalPortfolioRecords.toLocaleString()} records assigned
+              ({totalPortfolioRecords > 0 ? ((assignedRecords / totalPortfolioRecords) * 100).toFixed(1) : 0}%)
+            </span>
+          </div>
+          <div className="h-3 bg-gray-100 rounded-full overflow-hidden flex">
+            {segments.filter(s => (s.recordCount || 0) > 0).map((seg, i) => {
+              const pct = (seg.recordCount / totalPortfolioRecords) * 100;
+              const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-pink-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500'];
+              return (
+                <div
+                  key={seg.id}
+                  className={`h-full ${colors[i % colors.length]} transition-all duration-500 relative group`}
+                  style={{ width: `${pct}%`, minWidth: pct > 0 ? '3px' : '0' }}
+                  title={`${seg.name}: ${seg.recordCount} records (${pct.toFixed(1)}%)`}
+                >
+                  {/* Tooltip on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    {seg.name}: {seg.recordCount}
+                  </div>
+                </div>
+              );
+            })}
+            {unassignedRecords > 0 && (
+              <div
+                className="h-full bg-amber-300 transition-all duration-500 relative group"
+                style={{ width: `${(unassignedRecords / totalPortfolioRecords) * 100}%` }}
+                title={`Unassigned: ${unassignedRecords} records`}
+              >
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-[9px] rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Unassigned: {unassignedRecords}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-3 mt-2.5">
+            {segments.filter(s => (s.recordCount || 0) > 0).map((seg, i) => {
+              const colors = ['bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-pink-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500'];
+              return (
+                <div key={seg.id} className="flex items-center gap-1.5">
+                  <div className={`w-2.5 h-2.5 rounded-sm ${colors[i % colors.length]}`} />
+                  <span className="text-[10px] text-[var(--text-secondary)] font-medium">{seg.name} ({seg.recordCount})</span>
+                </div>
+              );
+            })}
+            {unassignedRecords > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm bg-amber-300" />
+                <span className="text-[10px] text-amber-600 font-medium">Unassigned ({unassignedRecords})</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Segment Cards */}
       {segments.length === 0 ? (
@@ -133,7 +252,7 @@ export default function SegmentsPage() {
                     />
                     <div className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
                       <Users className="w-3 h-3" />
-                      <span className="font-medium">{(seg.recordCount || 0).toLocaleString()}</span>
+                      <span className="font-bold">{(seg.recordCount || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

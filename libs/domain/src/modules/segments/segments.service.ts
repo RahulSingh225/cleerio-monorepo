@@ -118,7 +118,15 @@ export class SegmentsService extends BaseRepository<typeof segments> {
   }
 
   async findById(id: string) {
-    return this.findFirst(eq(segments.id, id));
+    const seg = await this.findFirst(eq(segments.id, id));
+    if (!seg) return null;
+    // Attach record count
+    const [countResult] = await this._db
+      .select({ value: count() })
+      .from(portfolioRecords)
+      .where(eq(portfolioRecords.segmentId, id))
+      .execute();
+    return { ...seg, recordCount: Number(countResult?.value || 0) };
   }
 
   async updateSegment(id: string, data: Partial<typeof segments.$inferInsert>) {

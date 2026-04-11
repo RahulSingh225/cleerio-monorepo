@@ -5,7 +5,7 @@ import { TenantRoleGuard } from '../auth/guards/tenant-role.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { TenantContext } from '@platform/tenant';
 
-@Controller('v1/repayment-syncs')
+@Controller('repayment-syncs')
 @UseGuards(JwtAuthGuard, TenantRoleGuard)
 export class RepaymentController {
   constructor(private readonly repaymentService: RepaymentService) {}

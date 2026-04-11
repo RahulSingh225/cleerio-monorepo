@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantRoleGuard } from '../auth/guards/tenant-role.guard';
 import { TenantContext } from '@platform/tenant';
 
-@Controller('v1/interactions')
+@Controller('interactions')
 @UseGuards(JwtAuthGuard, TenantRoleGuard)
 export class InteractionEventsController {
   constructor(private readonly interactionsService: InteractionEventsService) {}

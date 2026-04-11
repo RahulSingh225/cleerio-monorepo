@@ -9,8 +9,8 @@ export declare class JourneysService extends BaseRepository<typeof journeys> {
         createdAt: Date | null;
         updatedAt: Date | null;
         tenantId: string;
-        isActive: boolean | null;
         description: string | null;
+        isActive: boolean | null;
         segmentId: string;
         successMetric: string | null;
     }[]>;
@@ -67,8 +67,8 @@ export declare class JourneysService extends BaseRepository<typeof journeys> {
         createdAt: Date | null;
         updatedAt: Date | null;
         tenantId: string;
-        isActive: boolean | null;
         description: string | null;
+        isActive: boolean | null;
         segmentId: string;
         successMetric: string | null;
     }[]>;

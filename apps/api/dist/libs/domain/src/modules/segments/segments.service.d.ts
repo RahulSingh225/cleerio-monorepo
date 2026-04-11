@@ -23,17 +23,17 @@ export declare class SegmentsService extends BaseRepository<typeof segments> {
         createdAt: Date | null;
         updatedAt: Date | null;
         tenantId: string;
-        priority: number | null;
-        isActive: boolean | null;
         description: string | null;
         isDefault: boolean | null;
+        priority: number | null;
+        isActive: boolean | null;
         criteriaJsonb: unknown;
         successRate: string | null;
     }[]>;
     findAllWithCounts(): Promise<any[]>;
     findById(id: string): Promise<{
-        [x: string]: any;
-    }>;
+        recordCount: number;
+    } | null>;
     updateSegment(id: string, data: Partial<typeof segments.$inferInsert>): Promise<{
         id: string;
         tenantId: string;
@@ -72,10 +72,10 @@ export declare class SegmentsService extends BaseRepository<typeof segments> {
         createdAt: Date | null;
         updatedAt: Date | null;
         tenantId: string;
-        priority: number | null;
-        isActive: boolean | null;
         description: string | null;
         isDefault: boolean | null;
+        priority: number | null;
+        isActive: boolean | null;
         criteriaJsonb: unknown;
         successRate: string | null;
     }>;

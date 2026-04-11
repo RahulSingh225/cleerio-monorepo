@@ -26,8 +26,8 @@ let ReportsController = class ReportsController {
     async getSummary(req, portfolioId) {
         return this.reportsService.getPortfolioSummary(req.user.tenantId, portfolioId);
     }
-    async getDpdDist(req) {
-        return this.reportsService.getDpdDistribution(req.user.tenantId);
+    async getSegmentDist(req) {
+        return this.reportsService.getSegmentDistribution(req.user.tenantId);
     }
 };
 exports.ReportsController = ReportsController;
@@ -44,16 +44,16 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], ReportsController.prototype, "getSummary", null);
 __decorate([
-    (0, common_1.Get)('dpd-distribution'),
+    (0, common_1.Get)('segment-distribution'),
     (0, common_2.ApiResponseConfig)({
-        message: 'DPD distribution report generated successfully',
-        apiCode: 'REPORT_DPD_DIST_SUCCESS',
+        message: 'Segment distribution report generated successfully',
+        apiCode: 'REPORT_SEGMENT_DIST_SUCCESS',
     }),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
-], ReportsController.prototype, "getDpdDist", null);
+], ReportsController.prototype, "getSegmentDist", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.Controller)('reports'),
     (0, common_1.UseGuards)(domain_1.JwtAuthGuard, tenant_1.TenantGuard),

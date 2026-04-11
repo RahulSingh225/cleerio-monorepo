@@ -19,6 +19,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const tenant_role_guard_1 = require("../auth/guards/tenant-role.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const tenant_1 = require("../../../../tenant");
+const drizzle_1 = require("../../../../drizzle");
 let SegmentsController = class SegmentsController {
     segmentsService;
     constructor(segmentsService) {
@@ -31,6 +32,18 @@ let SegmentsController = class SegmentsController {
             tenantId,
         });
         return { data: segment };
+    }
+    async runSegmentation() {
+        const tenantId = tenant_1.TenantContext.tenantId;
+        await drizzle_1.db.insert(drizzle_1.taskQueue).values({
+            tenantId,
+            jobType: 'segmentation.run',
+            status: 'pending',
+            payload: { tenantId },
+            priority: 1,
+            runAfter: new Date(),
+        });
+        return { data: { status: 'queued', message: 'Segmentation run has been queued.' } };
     }
     async findAll() {
         const data = await this.segmentsService.findAllWithCounts();
@@ -58,6 +71,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], SegmentsController.prototype, "create", null);
+__decorate([
+    (0, common_1.Post)('run'),
+    (0, roles_decorator_1.Roles)('tenant_admin', 'ops'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], SegmentsController.prototype, "runSegmentation", null);
 __decorate([
     (0, common_1.Get)(),
     __metadata("design:type", Function),
@@ -89,7 +109,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], SegmentsController.prototype, "delete", null);
 exports.SegmentsController = SegmentsController = __decorate([
-    (0, common_1.Controller)('v1/segments'),
+    (0, common_1.Controller)('segments'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_role_guard_1.TenantRoleGuard),
     __metadata("design:paramtypes", [segments_service_1.SegmentsService])
 ], SegmentsController);

@@ -21,12 +21,12 @@ export class ReportsController {
     return this.reportsService.getPortfolioSummary(req.user.tenantId, portfolioId);
   }
 
-  @Get('dpd-distribution')
+  @Get('segment-distribution')
   @ApiResponseConfig({
-    message: 'DPD distribution report generated successfully',
-    apiCode: 'REPORT_DPD_DIST_SUCCESS',
+    message: 'Segment distribution report generated successfully',
+    apiCode: 'REPORT_SEGMENT_DIST_SUCCESS',
   })
-  async getDpdDist(@Request() req: any) {
-    return this.reportsService.getDpdDistribution(req.user.tenantId);
+  async getSegmentDist(@Request() req: any) {
+    return this.reportsService.getSegmentDistribution(req.user.tenantId);
   }
 }

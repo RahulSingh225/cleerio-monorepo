@@ -7,4 +7,62 @@ export declare class TenantFieldRegistryController {
     getMapping(): Promise<{
         [x: string]: any;
     }[]>;
+    getProfiles(): Promise<{
+        id: string;
+        tenantId: string;
+        name: string;
+        description: string | null;
+        mappings: unknown;
+        headers: unknown;
+        fieldCount: number | null;
+        isDefault: boolean | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+    }[]>;
+    getProfile(id: string): Promise<{
+        id: string;
+        tenantId: string;
+        name: string;
+        description: string | null;
+        mappings: unknown;
+        headers: unknown;
+        fieldCount: number | null;
+        isDefault: boolean | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+    }>;
+    createProfile(body: {
+        name: string;
+        description?: string;
+        mappings: Record<string, string>;
+        headers: string[];
+    }): Promise<{
+        id: string;
+        name: string;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+        tenantId: string;
+        description: string | null;
+        mappings: unknown;
+        headers: unknown;
+        fieldCount: number | null;
+        isDefault: boolean | null;
+    }>;
+    updateProfile(id: string, body: {
+        name?: string;
+        description?: string;
+        mappings?: Record<string, string>;
+        headers?: string[];
+    }): Promise<{
+        id: string;
+        tenantId: string;
+        name: string;
+        description: string | null;
+        mappings: unknown;
+        headers: unknown;
+        fieldCount: number | null;
+        isDefault: boolean | null;
+        createdAt: Date | null;
+        updatedAt: Date | null;
+    }>;
 }

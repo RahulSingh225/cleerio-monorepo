@@ -93,7 +93,15 @@ let SegmentsService = class SegmentsService extends repository_1.BaseRepository 
         return result;
     }
     async findById(id) {
-        return this.findFirst((0, drizzle_orm_1.eq)(drizzle_1.segments.id, id));
+        const seg = await this.findFirst((0, drizzle_orm_1.eq)(drizzle_1.segments.id, id));
+        if (!seg)
+            return null;
+        const [countResult] = await this._db
+            .select({ value: (0, drizzle_orm_1.count)() })
+            .from(drizzle_1.portfolioRecords)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioRecords.segmentId, id))
+            .execute();
+        return { ...seg, recordCount: Number(countResult?.value || 0) };
     }
     async updateSegment(id, data) {
         return this._db

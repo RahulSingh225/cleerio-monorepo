@@ -145,8 +145,10 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
 
   async handleSegmentationRun(tenantId: string) {
     this.logger.log(`Processing segmentation run for tenant: ${tenantId}`);
-    await this.segmentationRunsService.processRun(tenantId);
-    this.logger.log(`Completed segmentation run for tenant: ${tenantId}`);
+    // Create a run record first, then process it
+    const run = await this.segmentationRunsService.startRun(tenantId);
+    await this.segmentationRunsService.processRun(run.id);
+    this.logger.log(`Completed segmentation run ${run.id} for tenant: ${tenantId}`);
   }
 
   // ─── COMM.DISPATCH HANDLER ─────────────────────────────────────
@@ -220,7 +222,7 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
               userId: record.userId,
               product: record.product,
               currentDpd: record.currentDpd,
-              dpdBucket: record.dpdBucket,
+              segmentId: record.segmentId,
               overdue: record.outstanding,
               outstanding: record.outstanding,
               ...(record.dynamicFields as Record<string, any> || {}),

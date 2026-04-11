@@ -46,7 +46,7 @@ export default function TenantDetailPage() {
     try {
       const headers = { 'x-tenant-id': tenantId };
       const [fields, buckets, channels, templates, workflows] = await Promise.all([
-        api.get('/tenant-field-registry', { headers }).catch(() => ({ data: { data: [] } })),
+        api.get('/tenant-field-registry/mapping', { headers }).catch(() => ({ data: { data: [] } })),
         api.get('/dpd-bucket-configs', { headers }).catch(() => ({ data: { data: [] } })),
         api.get('/channel-configs', { headers }).catch(() => ({ data: { data: [] } })),
         api.get('/comm-templates', { headers }).catch(() => ({ data: { data: [] } })),

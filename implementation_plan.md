@@ -236,6 +236,14 @@ Repayment pipeline:
 
 ---
 
+#### [NEW] `apps/api/src/modules/portfolios/portfolios.controller.ts`
+
+- `POST /v1/portfolios/upload` — upload portfolio CSV
+- `POST /v1/portfolios/map-fields` — map CSV columns to `tenant_field_registry`
+- `POST /v1/portfolios/ingest` — finalize mapping and trigger `portfolio.ingest` Kafka event
+
+---
+
 ### Phase 5 — Dashboard: Complete UI Redesign
 
 This is the largest phase. Each page will be visually rich, leveraging React Flow, tree renderers, and data visualization.
@@ -252,6 +260,7 @@ Restructured navigation groups:
 OPERATIONS
 ├── Dashboard         → /insights          (overview metrics + live feed)
 ├── Portfolio Records → /cases             (borrower search + detail)
+├── Upload Portfolio  → /cases/upload      (NEW: drag-and-drop CSV ingestion)
 
 STRATEGY
 ├── Segments          → /segments          (NEW: segment list + rule builder)
@@ -451,6 +460,21 @@ Redesign with v2 data model:
 - **Journey Progress Tab**: Visual journey step indicator showing where this record is in their active journey
 - **Financial Tab**: Outstanding trends, repayment history chart, DPD movement
 - **Dynamic Fields Tab**: All `dynamic_fields` displayed in a clean key-value grid
+
+---
+
+#### 5.6 — Portfolio Upload & Ingestion (NEW)
+
+##### [NEW] `apps/dashboard/app/cases/upload/page.tsx`
+
+**Portfolio Data Ingestion Flow**:
+- **Step 1: Upload**: Drag-and-drop area for massive CSV files (supports 1M+ rows)
+- **Step 2: Field Mapping**:
+  - Automatically attempts to map CSV headers to `tenant_field_registry`
+  - Visual two-column mapping UI to let users map unassigned columns
+  - Option to create new dynamic fields directly from this UI
+- **Step 3: Validation & Preview**: Shows first 5 rows to verify mappings
+- **Step 4: Ingestion**: Pushes job to Worker (`portfolio.ingest`), which triggers automatic initial `segmentation.run`
 
 ---
 

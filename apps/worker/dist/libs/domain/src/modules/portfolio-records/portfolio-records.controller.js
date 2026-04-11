@@ -25,6 +25,66 @@ let PortfolioRecordsController = class PortfolioRecordsController {
     constructor(recordsService) {
         this.recordsService = recordsService;
     }
+    async getAvailableFields() {
+        const tenantId = tenant_1.TenantContext.tenantId;
+        const sample = await drizzle_1.db
+            .select({
+            dynamicFields: drizzle_1.portfolioRecords.dynamicFields,
+            product: drizzle_1.portfolioRecords.product,
+            currentDpd: drizzle_1.portfolioRecords.currentDpd,
+            outstanding: drizzle_1.portfolioRecords.outstanding,
+        })
+            .from(drizzle_1.portfolioRecords)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioRecords.tenantId, tenantId))
+            .limit(100)
+            .execute();
+        const coreFields = [
+            { key: 'current_dpd', label: 'Current DPD', dataType: 'number', isCore: true },
+            { key: 'outstanding', label: 'Outstanding Amount', dataType: 'number', isCore: true },
+            { key: 'total_repaid', label: 'Total Repaid', dataType: 'number', isCore: true },
+            { key: 'product', label: 'Product / Loan Type', dataType: 'string', isCore: true },
+            { key: 'employer_id', label: 'Employer ID', dataType: 'string', isCore: true },
+            { key: 'name', label: 'Borrower Name', dataType: 'string', isCore: true },
+            { key: 'mobile', label: 'Mobile Number', dataType: 'string', isCore: true },
+            { key: 'user_id', label: 'User ID', dataType: 'string', isCore: true },
+        ];
+        const dynamicKeySet = new Set();
+        for (const rec of sample) {
+            const df = rec.dynamicFields;
+            if (df && typeof df === 'object') {
+                for (const key of Object.keys(df)) {
+                    dynamicKeySet.add(key);
+                }
+            }
+        }
+        const coreKeySet = new Set(coreFields.map(f => f.key));
+        const dynamicFields = Array.from(dynamicKeySet)
+            .filter(k => !coreKeySet.has(k))
+            .map(key => {
+            let dataType = 'string';
+            for (const rec of sample) {
+                const df = rec.dynamicFields;
+                const val = df?.[key];
+                if (val !== undefined && val !== null && val !== '') {
+                    if (!isNaN(Number(val))) {
+                        dataType = 'number';
+                    }
+                    break;
+                }
+            }
+            return {
+                key,
+                label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                dataType,
+                isCore: false,
+            };
+        });
+        return { data: [...coreFields, ...dynamicFields] };
+    }
+    async getCount() {
+        const count = await this.recordsService.totalCount();
+        return { data: { count } };
+    }
     async findByPortfolio(portfolioId, limit, offset) {
         return this.recordsService.findMany({
             where: (0, drizzle_orm_1.eq)(drizzle_1.portfolioRecords.portfolioId, portfolioId),
@@ -37,6 +97,26 @@ let PortfolioRecordsController = class PortfolioRecordsController {
     }
 };
 exports.PortfolioRecordsController = PortfolioRecordsController;
+__decorate([
+    (0, common_1.Get)('fields'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Available fields retrieved',
+        apiCode: 'FIELDS_RETRIEVED',
+    }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], PortfolioRecordsController.prototype, "getAvailableFields", null);
+__decorate([
+    (0, common_1.Get)('count'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Record count retrieved',
+        apiCode: 'RECORD_COUNT',
+    }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], PortfolioRecordsController.prototype, "getCount", null);
 __decorate([
     (0, common_1.Get)('portfolio/:portfolioId'),
     (0, common_2.ApiResponseConfig)({

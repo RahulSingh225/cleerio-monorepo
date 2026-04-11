@@ -5,5 +5,6 @@ import { AuthenticatedUser } from '@platform/common';
 export declare class PortfolioRecordsService extends BaseRepository<typeof portfolioRecords> {
     constructor();
     buildAccessFilter(user: AuthenticatedUser): SQL | undefined;
+    totalCount(filter?: SQL): Promise<number>;
     insertBulkRecords(records: any[]): Promise<any[]>;
 }

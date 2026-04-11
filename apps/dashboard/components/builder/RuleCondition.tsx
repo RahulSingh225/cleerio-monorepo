@@ -21,6 +21,7 @@ interface FieldOption {
   key: string;
   label: string;
   dataType: string;
+  isCore?: boolean;
 }
 
 interface RuleConditionProps {
@@ -46,21 +47,24 @@ export function RuleCondition({ condition, fields, onChange, onDelete }: RuleCon
         className="flex-1 min-w-[140px] text-sm border border-[var(--border)] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-30 focus:border-[var(--primary)] transition-colors"
       >
         <option value="">Select field...</option>
-        <optgroup label="Core Fields">
-          <option value="current_dpd">Current DPD</option>
-          <option value="outstanding">Outstanding</option>
-          <option value="total_repaid">Total Repaid</option>
-          <option value="product">Product</option>
-          <option value="employer_id">Employer</option>
-          <option value="dpd_bucket">DPD Bucket</option>
-        </optgroup>
-        <optgroup label="Dynamic Fields">
-          {fields.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.label} ({f.dataType})
-            </option>
-          ))}
-        </optgroup>
+        {fields.filter(f => f.isCore).length > 0 && (
+          <optgroup label="Core Fields">
+            {fields.filter(f => f.isCore).map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label} ({f.dataType})
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {fields.filter(f => !f.isCore).length > 0 && (
+          <optgroup label="Dynamic Fields">
+            {fields.filter(f => !f.isCore).map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label} ({f.dataType})
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
 
       {/* Operator */}

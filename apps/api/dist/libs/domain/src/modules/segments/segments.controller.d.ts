@@ -11,12 +11,18 @@ export declare class SegmentsController {
             createdAt: Date | null;
             updatedAt: Date | null;
             tenantId: string;
-            priority: number | null;
-            isActive: boolean | null;
             description: string | null;
             isDefault: boolean | null;
+            priority: number | null;
+            isActive: boolean | null;
             criteriaJsonb: unknown;
             successRate: string | null;
+        };
+    }>;
+    runSegmentation(): Promise<{
+        data: {
+            status: string;
+            message: string;
         };
     }>;
     findAll(): Promise<{
@@ -24,8 +30,8 @@ export declare class SegmentsController {
     }>;
     findById(id: string): Promise<{
         data: {
-            [x: string]: any;
-        };
+            recordCount: number;
+        } | null;
     }>;
     update(id: string, body: any): Promise<{
         data: {

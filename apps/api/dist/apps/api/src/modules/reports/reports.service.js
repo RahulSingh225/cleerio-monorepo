@@ -37,16 +37,16 @@ let ReportsService = class ReportsService {
             portfolioId: portfolioId || 'ALL',
         };
     }
-    async getDpdDistribution(tenantId) {
+    async getSegmentDistribution(tenantId) {
         return drizzle_1.db
             .select({
-            bucket: drizzle_1.portfolioRecords.dpdBucket,
+            segmentId: drizzle_1.portfolioRecords.segmentId,
             count: (0, drizzle_orm_1.count)(),
-            totalOverdue: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.outstanding),
+            totalOutstanding: (0, drizzle_orm_1.sum)(drizzle_1.portfolioRecords.outstanding),
         })
             .from(drizzle_1.portfolioRecords)
             .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioRecords.tenantId, tenantId))
-            .groupBy(drizzle_1.portfolioRecords.dpdBucket);
+            .groupBy(drizzle_1.portfolioRecords.segmentId);
     }
 };
 exports.ReportsService = ReportsService;

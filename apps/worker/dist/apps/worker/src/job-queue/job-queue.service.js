@@ -36,7 +36,7 @@ let JobQueueService = JobQueueService_1 = class JobQueueService extends reposito
         let claimedJobs = [];
         await this._db.transaction(async (tx) => {
             const lockedJobsRes = await tx.execute((0, drizzle_orm_1.sql) `
-        SELECT id, job_type, payload FROM task_queue
+        SELECT id, task_type as job_type, payload FROM task_queue
         WHERE status = 'pending' AND run_after <= NOW()
         ORDER BY priority ASC, created_at ASC
         LIMIT 5
@@ -121,8 +121,9 @@ let JobQueueService = JobQueueService_1 = class JobQueueService extends reposito
     }
     async handleSegmentationRun(tenantId) {
         this.logger.log(`Processing segmentation run for tenant: ${tenantId}`);
-        await this.segmentationRunsService.processRun(tenantId);
-        this.logger.log(`Completed segmentation run for tenant: ${tenantId}`);
+        const run = await this.segmentationRunsService.startRun(tenantId);
+        await this.segmentationRunsService.processRun(run.id);
+        this.logger.log(`Completed segmentation run ${run.id} for tenant: ${tenantId}`);
     }
     async handleCommDispatch(tenantId, jobId) {
         this.logger.log(`Processing comm.dispatch for tenant: ${tenantId}`);
@@ -175,7 +176,7 @@ let JobQueueService = JobQueueService_1 = class JobQueueService extends reposito
                             userId: record.userId,
                             product: record.product,
                             currentDpd: record.currentDpd,
-                            dpdBucket: record.dpdBucket,
+                            segmentId: record.segmentId,
                             overdue: record.outstanding,
                             outstanding: record.outstanding,
                             ...(record.dynamicFields || {}),

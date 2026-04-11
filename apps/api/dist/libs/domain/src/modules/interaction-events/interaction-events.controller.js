@@ -38,7 +38,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], InteractionEventsController.prototype, "findAll", null);
 exports.InteractionEventsController = InteractionEventsController = __decorate([
-    (0, common_1.Controller)('v1/interactions'),
+    (0, common_1.Controller)('interactions'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_role_guard_1.TenantRoleGuard),
     __metadata("design:paramtypes", [interaction_events_service_1.InteractionEventsService])
 ], InteractionEventsController);

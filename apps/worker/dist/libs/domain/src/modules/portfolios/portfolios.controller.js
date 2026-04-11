@@ -29,16 +29,44 @@ let PortfoliosController = class PortfoliosController {
         this.portfoliosService = portfoliosService;
     }
     async uploadPortfolio(file, tenant, req) {
+        const preview = await this.portfoliosService.parseCsvHeadersAndPreview(file.buffer);
         const results = await this.portfoliosService.insert({
             tenantId: tenant.tenantId,
             uploadedBy: req.user.userId,
             allocationMonth: new Date().toISOString().substring(0, 7),
             sourceType: 'csv',
-            status: 'processing',
+            status: 'pending_mapping',
         });
         const newPortfolio = results[0];
-        this.portfoliosService.parseAndIngestCSV(file.buffer, tenant.tenantId, newPortfolio.id);
-        return newPortfolio;
+        const savedProfiles = await drizzle_1.db
+            .select()
+            .from(drizzle_1.portfolioMappingProfiles)
+            .where((0, drizzle_orm_1.eq)(drizzle_1.portfolioMappingProfiles.tenantId, tenant.tenantId))
+            .orderBy(drizzle_1.portfolioMappingProfiles.createdAt)
+            .execute();
+        return {
+            portfolioId: newPortfolio.id,
+            headers: preview.headers,
+            previewRows: preview.rows,
+            savedProfiles,
+        };
+    }
+    async ingestPortfolio(portfolioId, file, tenant, req) {
+        let mappings = {};
+        let profileId;
+        let profileName;
+        try {
+            const rawMappings = req.body?.mappings;
+            if (rawMappings) {
+                mappings = typeof rawMappings === 'string' ? JSON.parse(rawMappings) : rawMappings;
+            }
+            profileId = req.body?.profileId || undefined;
+            profileName = req.body?.profileName || undefined;
+        }
+        catch (e) {
+        }
+        this.portfoliosService.parseAndIngestCSV(file.buffer, tenant.tenantId, portfolioId, mappings, profileId, profileName);
+        return { status: 'processing', portfolioId };
     }
     async findAll(req) {
         return this.portfoliosService.findAllForUser(req.user);
@@ -55,8 +83,8 @@ __decorate([
     (0, common_1.Post)('upload'),
     (0, roles_decorator_1.Roles)('tenant_admin', 'ops'),
     (0, common_2.ApiResponseConfig)({
-        message: 'Portfolio successfully uploaded and processing started',
-        apiCode: 'PORTFOLIO_UPLOAD_STARTED',
+        message: 'Portfolio CSV uploaded and headers parsed for mapping',
+        apiCode: 'PORTFOLIO_UPLOADED_FOR_MAPPING',
     }),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
     __param(0, (0, common_1.UploadedFile)()),
@@ -66,6 +94,22 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], PortfoliosController.prototype, "uploadPortfolio", null);
+__decorate([
+    (0, common_1.Post)(':id/ingest'),
+    (0, roles_decorator_1.Roles)('tenant_admin', 'ops'),
+    (0, common_2.ApiResponseConfig)({
+        message: 'Portfolio ingestion started',
+        apiCode: 'PORTFOLIO_INGEST_STARTED',
+    }),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, tenant_1.CurrentTenant)()),
+    __param(3, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], PortfoliosController.prototype, "ingestPortfolio", null);
 __decorate([
     (0, common_1.Get)(),
     (0, common_2.ApiResponseConfig)({

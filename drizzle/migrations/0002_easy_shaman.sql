@@ -1,0 +1,1 @@
+ALTER TABLE "portfolio_records" DROP COLUMN "dpd_bucket";

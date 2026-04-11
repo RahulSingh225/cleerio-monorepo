@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, SQL } from 'drizzle-orm';
+import { eq, SQL, count } from 'drizzle-orm';
 import { db, portfolioRecords } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 import { AuthenticatedUser } from '@platform/common';
@@ -21,9 +21,16 @@ export class PortfolioRecordsService extends BaseRepository<typeof portfolioReco
     }
     
     // Example: Analysts only see records in portfolios they own
-    // This would require a join with the portfolios table in a more complex builder,
-    // but for simple cases we stick to direct table columns.
     return undefined; 
+  }
+
+  async totalCount(filter?: SQL) {
+    const [result] = await this._db
+      .select({ value: count() })
+      .from(portfolioRecords)
+      .where(filter)
+      .execute();
+    return Number(result?.value || 0);
   }
 
   async insertBulkRecords(records: any[]) {

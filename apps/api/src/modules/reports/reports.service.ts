@@ -35,17 +35,17 @@ export class ReportsService {
   }
 
   /**
-   * DPD Distribution Report: Breakdown of records by bucket
+   * Segment Distribution Report: Breakdown of records by segment (formerly DPD bucket)
    */
-  async getDpdDistribution(tenantId: string) {
+  async getSegmentDistribution(tenantId: string) {
     return db
       .select({
-        bucket: portfolioRecords.dpdBucket,
+        segmentId: portfolioRecords.segmentId,
         count: count(),
-        totalOverdue: sum(portfolioRecords.outstanding),
+        totalOutstanding: sum(portfolioRecords.outstanding),
       })
       .from(portfolioRecords)
       .where(eq(portfolioRecords.tenantId, tenantId))
-      .groupBy(portfolioRecords.dpdBucket);
+      .groupBy(portfolioRecords.segmentId);
   }
 }

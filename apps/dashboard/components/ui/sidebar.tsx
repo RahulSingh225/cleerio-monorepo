@@ -19,6 +19,7 @@ import {
   CreditCard,
   Sparkles,
   Briefcase,
+  Upload,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -46,6 +47,7 @@ export function Sidebar() {
         : [
             { name: 'Dashboard', href: '/insights', icon: LayoutDashboard },
             { name: 'Portfolio Records', href: '/cases', icon: Briefcase },
+            { name: 'Upload Portfolio', href: '/cases/upload', icon: Upload },
           ],
     },
     ...(!isPlatformAdmin
