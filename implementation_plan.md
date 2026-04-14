@@ -210,6 +210,45 @@ Major rewrite:
 
 ---
 
+#### [NEW] `apps/worker/src/job-queue/providers/generic-dispatcher.service.ts`
+
+**Phase 4.1 — Bring Your Own Config (BYOC): Universal cURL Dispatcher**
+
+To make the system as abstract as possible, we will eliminate hardcoded adapters entirely. Instead of autonomously synchronizing templates via API, we will allow users to configure channels and templates manually and instruct the system on *how* to execute arbitrary HTTP APIs using a generic runner.
+
+**1. Schema Update (`channel_configs`)**:
+Add a flexible API blueprint:
+- `dispatchApiTemplate` (jsonb): A parsed structure of the user's sample cURL request. It stores how to call the vendor.
+  ```json
+  {
+    "url": "https://control.msg91.com/api/v5/flow",
+    "method": "POST",
+    "headers": { "authkey": "{{api_key}}", "content-type": "application/json" },
+    "bodyTemplate": {
+      "template_id": "{{TEMPLATE_ID}}",
+      "recipients": [ { "mobiles": "{{mobile}}", "###VAR_INJECTION###": true } ]
+    }
+  }
+  ```
+
+**2. Template Management Lifecycle (Manual Registration)**:
+Modify `comm_templates` table to handle external IDs without automatic API syncing:
+- Schema Additions: `providerTemplateId` (varchar) and `providerVariables` (jsonb).
+- **Workflow**: 
+  1. The user creates and approves the template fully inside the external provider's platform (MSG91/WATI).
+  2. The user comes to Cleerio, creates a new template, and inputs the external `template_id` into `providerTemplateId`.
+  3. The user maps vendor-specific variables to Cleerio dynamic fields (e.g., `providerVariables: [{"vendorVar": "VAR1", "systemVar": "name"}, {"vendorVar": "VAR2", "systemVar": "outstanding"}]`).
+
+**3. The Universal Dispatch Execution**:
+During `handleCommDispatch`, the generic service builds a dynamic API request for ANY vendor without needing adapter code:
+- Fetches the `dispatchApiTemplate` from `channel_configs` and the `providerTemplateId` + `providerVariables` from `comm_templates`.
+- Resolves the API Key headers from the channel config.
+- Injects the `providerTemplateId` into the `{{TEMPLATE_ID}}` placeholder in the body.
+- Generates the variable payload (e.g., `"VAR1": "Rahul", "VAR2": "1500"`) and injects it into the `###VAR_INJECTION###` node.
+- Fires a standard Javascript `fetch()` or `axios()` HTTP call to the vendor's API endpoint dynamically. Extensibility is fully achieved via configuration alone.
+
+---
+
 #### [NEW] `libs/domain/src/modules/interaction-events/interaction-events.service.ts`
 
 Feedback recording:
