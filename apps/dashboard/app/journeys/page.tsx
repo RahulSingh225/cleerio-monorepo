@@ -28,6 +28,7 @@ import Link from 'next/link';
 import {
   Plus, Route, Loader2, Target, Timer, Send, GitBranch,
   CheckCircle, XCircle, UserCheck, Save, Rocket, RotateCcw, ArrowLeft,
+  MessageSquare, MessageCircle
 } from 'lucide-react';
 
 const nodeTypes = {
@@ -43,7 +44,8 @@ const nodeTypes = {
 const palette = [
   { type: 'segmentTrigger', label: 'Segment Trigger', icon: Target, gradient: 'from-emerald-500 to-emerald-400' },
   { type: 'waitDelay', label: 'Wait / Delay', icon: Timer, gradient: 'from-amber-500 to-amber-400' },
-  { type: 'sendMessage', label: 'Send Message', icon: Send, gradient: 'from-blue-500 to-blue-400' },
+  { type: 'sendMessage', data: { channel: 'sms' }, label: 'Send SMS', icon: MessageSquare, gradient: 'from-blue-500 to-blue-400' },
+  { type: 'sendMessage', data: { channel: 'whatsapp' }, label: 'Send WhatsApp', icon: MessageCircle, gradient: 'from-green-500 to-green-400' },
   { type: 'conditionCheck', label: 'Condition', icon: GitBranch, gradient: 'from-purple-500 to-purple-400' },
   { type: 'manualReview', label: 'Manual Review', icon: UserCheck, gradient: 'from-orange-500 to-orange-400' },
   { type: 'endSuccess', label: 'Success End', icon: CheckCircle, gradient: 'from-green-500 to-emerald-400' },
@@ -159,16 +161,15 @@ export default function JourneyBuilderPage() {
     );
   }, [setEdges]);
 
-  const addNode = (type: string) => {
+  const addNode = (type: string, initialData: any = {}) => {
     const id = `${type}_${Date.now()}`;
-    const existingOfType = nodes.filter(n => n.type === type).length;
     setNodes((nds) => [
       ...nds,
       {
         id,
         type,
         position: { x: 250, y: 80 + (nds.length * 160) },
-        data: {},
+        data: initialData,
       },
     ]);
   };
@@ -340,8 +341,8 @@ export default function JourneyBuilderPage() {
               <p className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider px-1 pb-1">Add Nodes</p>
               {palette.map(p => (
                 <button
-                  key={p.type}
-                  onClick={() => addNode(p.type)}
+                  key={p.label}
+                  onClick={() => addNode(p.type, p.data)}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:shadow-sm hover:scale-[1.02] active:scale-95 bg-white border border-[var(--border)] hover:border-[var(--primary)] text-[var(--text-primary)]"
                 >
                   <div className={`w-6 h-6 rounded-md bg-gradient-to-br ${p.gradient} flex items-center justify-center`}>
