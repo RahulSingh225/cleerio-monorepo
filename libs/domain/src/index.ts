@@ -18,6 +18,7 @@ export * from './modules/dpd-bucket-configs/dpd-bucket-configs.service';
 
 export * from './modules/channel-configs/channel-configs.module';
 export * from './modules/channel-configs/channel-configs.service';
+export * from './modules/channel-configs/generic-dispatcher.service';
 
 export * from './modules/comm-templates/comm-templates.module';
 export * from './modules/comm-templates/comm-templates.service';
@@ -51,12 +52,14 @@ export * from './modules/report-jobs/report-jobs.service';
 
 export * from './modules/segments/segments.module';
 export * from './modules/segments/segments.service';
+export * from './modules/segments/reassignment-rules.service';
 
 export * from './modules/segmentation-runs/segmentation-runs.module';
 export * from './modules/segmentation-runs/segmentation-runs.service';
 
 export * from './modules/journeys/journeys.module';
 export * from './modules/journeys/journeys.service';
+export * from './modules/journeys/journey-progression.service';
 
 export * from './modules/journey-steps/journey-steps.service';
 
@@ -65,3 +68,13 @@ export * from './modules/interaction-events/interaction-events.service';
 
 export * from './modules/repayment/repayment.module';
 export * from './modules/repayment/repayment.service';
+
+export * from './modules/webhooks/webhooks.module';
+export * from './modules/webhooks/callback-normalizer.service';
+export * from './modules/webhooks/feedback-processor.service';
+
+export * from './modules/data-points/data-points.module';
+export * from './modules/data-points/data-points.service';
+
+export * from './modules/payment-links/payment-links.module';
+export * from './modules/payment-links/payment-links.service';

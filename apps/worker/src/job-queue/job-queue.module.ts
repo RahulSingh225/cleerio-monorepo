@@ -12,6 +12,8 @@ import {
   // V2 Modules
   SegmentationRunsModule,
   SegmentsModule,
+  JourneysModule,
+  WebhooksModule as DomainWebhooksModule,
 } from '@platform/domain';
 
 @Module({
@@ -27,6 +29,8 @@ import {
     // V2 Modules
     SegmentationRunsModule,
     SegmentsModule,
+    JourneysModule,
+    DomainWebhooksModule,
   ],
   providers: [JobQueueService],
   exports: [JobQueueService],

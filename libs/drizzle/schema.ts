@@ -121,6 +121,8 @@ export const tenantFieldRegistry = pgTable(
     dataType: varchar('data_type', { length: 20 }).default('string'),
     isCore: boolean('is_core').default(false),
     isPii: boolean('is_pii').default(false),
+    isStrategic: boolean('is_strategic').default(false),
+    semanticRole: varchar('semantic_role', { length: 50 }),  // loan_id | due_date | emi | language | contact_alt | payment_link | risk_score | etc.
     sampleValue: varchar('sample_value', { length: 255 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -250,23 +252,55 @@ export const portfolioRecords = pgTable(
       .notNull()
       .references(() => tenants.id),
 
-    // Core identity & financial fields
+    // ── Core identity & financial fields ──
     userId: varchar('user_id', { length: 100 }).notNull(),
     mobile: varchar('mobile', { length: 15 }).notNull(),
     name: varchar('name', { length: 255 }),
     product: varchar('product', { length: 100 }),
-    employerId: varchar('employer_id', { length: 50 }),
+    employerName: varchar('employer_name', { length: 255 }),
     outstanding: numeric('outstanding', { precision: 14, scale: 2 }).default('0'),
     currentDpd: integer('current_dpd').default(0),
 
-    // All upload columns stored as fieldN keys
+    // ── Promoted core fields (from stakeholder docs) ──
+    loanNumber: varchar('loan_number', { length: 100 }),
+    email: varchar('email', { length: 255 }),
+    dueDate: date('due_date'),
+    emiAmount: numeric('emi_amount', { precision: 14, scale: 2 }),
+    language: varchar('language', { length: 20 }),
+    state: varchar('state', { length: 100 }),
+    city: varchar('city', { length: 100 }),
+    cibilScore: integer('cibil_score'),
+    salaryDate: integer('salary_date'),           // Day of month (1-31)
+    enachEnabled: boolean('enach_enabled'),
+    alternateNumbers: jsonb('alternate_numbers').default([]),  // [ref1, ref2, alt1, alt2]
+    loanAmount: numeric('loan_amount', { precision: 14, scale: 2 }),
+
+    // ── Dynamic fields (all other CSV columns) ──
     dynamicFields: jsonb('dynamic_fields').default({}),
 
-    // Segmentation
+    // ── Segmentation ──
     segmentId: uuid('segment_id').references(() => segments.id),
     lastSegmentedAt: timestamp('last_segmented_at', { withTimezone: true }),
 
-    // Record state
+    // ── Communication feedback summary ──
+    lastContactedAt: timestamp('last_contacted_at', { withTimezone: true }),
+    lastContactedChannel: varchar('last_contacted_channel', { length: 20 }),
+    lastDeliveryStatus: varchar('last_delivery_status', { length: 30 }),
+    lastInteractionType: varchar('last_interaction_type', { length: 50 }),
+    lastInteractionAt: timestamp('last_interaction_at', { withTimezone: true }),
+    ptpDate: date('ptp_date'),
+    ptpAmount: numeric('ptp_amount', { precision: 14, scale: 2 }),
+    ptpStatus: varchar('ptp_status', { length: 20 }),  // pending_review | confirmed | honored | broken
+    contactabilityScore: integer('contactability_score').default(0),
+    preferredChannel: varchar('preferred_channel', { length: 20 }),
+    totalCommAttempts: integer('total_comm_attempts').default(0),
+    totalCommDelivered: integer('total_comm_delivered').default(0),
+    totalCommRead: integer('total_comm_read').default(0),
+    totalCommReplied: integer('total_comm_replied').default(0),
+    riskBucket: varchar('risk_bucket', { length: 20 }),
+    feedbackSummary: jsonb('feedback_summary').default({}),
+
+    // ── Record state ──
     isOptedOut: boolean('is_opted_out').default(false),
     lastRepaymentAt: timestamp('last_repayment_at', { withTimezone: true }),
     totalRepaid: numeric('total_repaid', { precision: 14, scale: 2 }).default('0'),
@@ -283,6 +317,13 @@ export const portfolioRecords = pgTable(
     tenantOutstandingIdx: index('portfolio_records_tenant_outstanding_idx').on(t.tenantId, t.outstanding),
     portfolioIdIdx: index('portfolio_records_portfolio_id_idx').on(t.portfolioId),
     dynamicFieldsGinIdx: index('portfolio_records_dynamic_fields_gin_idx').using('gin', t.dynamicFields),
+    // New strategic indexes
+    tenantStateIdx: index('portfolio_records_tenant_state_idx').on(t.tenantId, t.state),
+    tenantCibilIdx: index('portfolio_records_tenant_cibil_idx').on(t.tenantId, t.cibilScore),
+    tenantDueDateIdx: index('portfolio_records_tenant_due_date_idx').on(t.tenantId, t.dueDate),
+    tenantLoanNumberIdx: index('portfolio_records_tenant_loan_number_idx').on(t.tenantId, t.loanNumber),
+    tenantEmailIdx: index('portfolio_records_tenant_email_idx').on(t.tenantId, t.email),
+    tenantContactabilityIdx: index('portfolio_records_tenant_contactability_idx').on(t.tenantId, t.contactabilityScore),
   })
 );
 
@@ -349,11 +390,53 @@ export const channelConfigs = pgTable(
     dispatchApiTemplate: jsonb('dispatch_api_template').default({}),
     dailyCap: integer('daily_cap'),
     hourlyCap: integer('hourly_cap'),
+    // Webhook callback configuration
+    callbackUrl: text('callback_url'),
+    callbackSecret: varchar('callback_secret', { length: 255 }),
+    callbackPayloadMap: jsonb('callback_payload_map').default({}),
     updatedBy: uuid('updated_by').references(() => tenantUsers.id),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
     tenantChannelIdx: uniqueIndex('channel_configs_tenant_channel_idx').on(t.tenantId, t.channel),
+  })
+);
+
+// ─── PORTFOLIO CONFIGS (Allocation Checklist) ───────────────
+
+export const portfolioConfigs = pgTable(
+  'portfolio_configs',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    portfolioId: uuid('portfolio_id').references(() => portfolios.id),
+    lenderName: varchar('lender_name', { length: 255 }),
+    totalBookSize: numeric('total_book_size', { precision: 14, scale: 2 }),
+    securedUnsecuredSplit: varchar('secured_unsecured_split', { length: 20 }),
+    primaryProducts: jsonb('primary_products').default([]),
+    monthlyInflow: numeric('monthly_inflow', { precision: 14, scale: 2 }),
+    currentDpdStock: numeric('current_dpd_stock', { precision: 14, scale: 2 }),
+    currentEfficiency: numeric('current_efficiency', { precision: 5, scale: 2 }),
+    targetEfficiency: numeric('target_efficiency', { precision: 5, scale: 2 }),
+    targetRor: numeric('target_ror', { precision: 5, scale: 2 }),
+    currentContactability: numeric('current_contactability', { precision: 5, scale: 2 }),
+    approvedChannels: jsonb('approved_channels').default([]),
+    allocationStartDate: date('allocation_start_date'),
+    allocationEndDate: date('allocation_end_date'),
+    paidFileFrequency: varchar('paid_file_frequency', { length: 20 }),
+    waiverGrid: jsonb('waiver_grid').default({}),
+    currentAcr: numeric('current_acr', { precision: 8, scale: 2 }),
+    commercialsModel: varchar('commercials_model', { length: 50 }),
+    reportingFrequency: varchar('reporting_frequency', { length: 20 }),
+    expectedRegionSplit: jsonb('expected_region_split').default({}),
+    stakeholderGoals: jsonb('stakeholder_goals').default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('portfolio_configs_tenant_id_idx').on(t.tenantId),
   })
 );
 
@@ -460,8 +543,13 @@ export const deliveryLogs = pgTable(
     deliveryStatus: varchar('delivery_status', { length: 30 }),
     errorCode: varchar('error_code', { length: 50 }),
     errorMessage: text('error_message'),
+    failureReason: varchar('failure_reason', { length: 100 }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     readAt: timestamp('read_at', { withTimezone: true }),
+    repliedAt: timestamp('replied_at', { withTimezone: true }),
+    replyContent: text('reply_content'),
+    linkClicked: boolean('link_clicked').default(false),
+    linkClickedAt: timestamp('link_clicked_at', { withTimezone: true }),
     callbackPayload: jsonb('callback_payload').default({}),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },

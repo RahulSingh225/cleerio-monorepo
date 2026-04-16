@@ -24,11 +24,12 @@ import { WaitDelayNode } from '@/components/builder/nodes/WaitDelayNode';
 import { SendMessageNode } from '@/components/builder/nodes/SendMessageNode';
 import { ConditionCheckNode } from '@/components/builder/nodes/ConditionCheckNode';
 import { EndSuccessNode, EndFailureNode, ManualReviewNode } from '@/components/builder/nodes/EndNode';
+import { ReassignSegmentNode } from '@/components/builder/nodes/ReassignSegmentNode';
 import Link from 'next/link';
 import {
   Plus, Route, Loader2, Target, Timer, Send, GitBranch,
   CheckCircle, XCircle, UserCheck, Save, Rocket, RotateCcw, ArrowLeft,
-  MessageSquare, MessageCircle
+  MessageSquare, MessageCircle, ArrowRightLeft
 } from 'lucide-react';
 
 const nodeTypes = {
@@ -39,11 +40,14 @@ const nodeTypes = {
   endSuccess: EndSuccessNode,
   endFailure: EndFailureNode,
   manualReview: ManualReviewNode,
+  reassignSegment: ReassignSegmentNode,
 };
 
 const palette = [
   { type: 'segmentTrigger', label: 'Segment Trigger', icon: Target, gradient: 'from-emerald-500 to-emerald-400' },
   { type: 'waitDelay', label: 'Wait / Delay', icon: Timer, gradient: 'from-amber-500 to-amber-400' },
+  { type: 'waitDelay', data: { delayHours: 0, label: 'Wait for Feedback' }, label: 'Wait for Feedback', icon: Timer, gradient: 'from-amber-400 to-yellow-400' },
+  { type: 'reassignSegment', label: 'Reassign Segment', icon: ArrowRightLeft, gradient: 'from-indigo-500 to-indigo-400' },
   { type: 'sendMessage', data: { channel: 'sms' }, label: 'Send SMS', icon: MessageSquare, gradient: 'from-blue-500 to-blue-400' },
   { type: 'sendMessage', data: { channel: 'whatsapp' }, label: 'Send WhatsApp', icon: MessageCircle, gradient: 'from-green-500 to-green-400' },
   { type: 'conditionCheck', label: 'Condition', icon: GitBranch, gradient: 'from-purple-500 to-purple-400' },

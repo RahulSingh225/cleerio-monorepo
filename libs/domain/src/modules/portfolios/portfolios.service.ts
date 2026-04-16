@@ -84,7 +84,12 @@ export class PortfoliosService extends BaseRepository<typeof portfolios> {
     }
 
     // Core fields that map to top-level columns on portfolio_records
-    const CORE_FIELD_SET = new Set(['userId', 'mobile', 'name', 'product', 'employerId', 'currentDpd', 'outstanding']);
+    const CORE_FIELD_SET = new Set([
+      'userId', 'mobile', 'name', 'product', 'employerName', 'currentDpd', 'outstanding',
+      // Promoted core fields (from stakeholder data requirements)
+      'loanNumber', 'email', 'dueDate', 'emiAmount', 'language', 'state', 'city',
+      'cibilScore', 'salaryDate', 'enachEnabled', 'loanAmount',
+    ]);
 
     // Build the inverse mapping: CSV header → { coreField?: string, dynamicKey?: string }
     // Step 1: Start from user-provided mappings
@@ -194,10 +199,16 @@ export class PortfoliosService extends BaseRepository<typeof portfolios> {
 
                 if (mapping.coreField) {
                   // Set on the top-level record object
-                  record[mapping.coreField] = this.coerceValue(value, 
-                    ['currentDpd'].includes(mapping.coreField) ? 'number' :
-                    ['outstanding'].includes(mapping.coreField) ? 'number' : 'string'
-                  );
+                  const numericCoreFields = ['currentDpd', 'outstanding', 'emiAmount', 'cibilScore', 'salaryDate', 'loanAmount'];
+                  const dateCoreFields = ['dueDate'];
+                  const booleanCoreFields = ['enachEnabled'];
+
+                  let fieldType = 'string';
+                  if (numericCoreFields.includes(mapping.coreField)) fieldType = 'number';
+                  else if (dateCoreFields.includes(mapping.coreField)) fieldType = 'date';
+                  else if (booleanCoreFields.includes(mapping.coreField)) fieldType = 'boolean';
+
+                  record[mapping.coreField] = this.coerceValue(value, fieldType);
                 }
 
                 if (mapping.dynamicKey) {

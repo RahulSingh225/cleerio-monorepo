@@ -18,12 +18,19 @@ import {
   Mail,
   User,
   Loader2,
+  Activity,
+  AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function CaseDetailsPage() {
   const params = useParams();
   const recordId = params.id as string;
   const [record, setRecord] = useState<any>(null);
+  const [interactions, setInteractions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +41,13 @@ export default function CaseDetailsPage() {
     try {
       const res = await api.get(`/portfolio-records/${recordId}`);
       setRecord(res.data.data);
+
+      try {
+        const eventsRes = await api.get(`/interactions/record/${recordId}`);
+        setInteractions(eventsRes.data.data || []);
+      } catch (e) {
+        console.warn('Could not load interactions', e);
+      }
     } catch (err) {
       console.error('Failed to load record', err);
     } finally {
@@ -145,10 +159,22 @@ export default function CaseDetailsPage() {
                 <Phone className="w-4 h-4 text-[var(--text-tertiary)]" />
                 <span className="text-[var(--text-primary)]">{record.mobile}</span>
               </div>
-              {record.employerId && (
+              {record.employerName && (
                 <div className="flex items-center gap-3">
                   <User className="w-4 h-4 text-[var(--text-tertiary)]" />
-                  <span className="text-[var(--text-primary)]">Employer: {record.employerId}</span>
+                  <span className="text-[var(--text-primary)]">Employer: {record.employerName}</span>
+                </div>
+              )}
+              {record.email && (
+                <div className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-[var(--text-tertiary)]" />
+                  <span className="text-[var(--text-primary)]">{record.email}</span>
+                </div>
+              )}
+              {(record.state || record.city) && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-[var(--text-tertiary)]" />
+                  <span className="text-[var(--text-primary)]">{[record.city, record.state].filter(Boolean).join(', ')}</span>
                 </div>
               )}
             </div>
@@ -170,6 +196,69 @@ export default function CaseDetailsPage() {
               <StatusBadge label={record.isOptedOut ? 'Yes' : 'No'} variant={record.isOptedOut ? 'critical' : 'success'} />
             </div>
           </div>
+
+          {/* Insights / Engagement */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[var(--primary)]" />
+              Engagement Insights
+            </h3>
+            
+            <div className="space-y-5">
+              {/* Score Gauge */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-[var(--text-secondary)]">Contactability Score</span>
+                  <span className="font-bold text-[var(--text-primary)]">{record.contactabilityScore || 0}/100</span>
+                </div>
+                <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{ 
+                      width: `${record.contactabilityScore || 0}%`,
+                      backgroundColor: (record.contactabilityScore || 0) > 60 ? '#10B981' : (record.contactabilityScore || 0) > 30 ? '#F59E0B' : '#EF4444'
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-[var(--text-tertiary)] mt-1">
+                  <span>Based on {record.totalCommAttempts || 0} attempts</span>
+                  {record.preferredChannel && <span className="capitalize">Prefers {record.preferredChannel}</span>}
+                </div>
+              </div>
+
+              {/* PTP Section */}
+              {record.ptpDate ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Promise to Pay
+                    </span>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                      record.ptpStatus === 'pending_review' ? 'bg-amber-100 text-amber-700' :
+                      record.ptpStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                      record.ptpStatus === 'broken' ? 'bg-red-100 text-red-700' :
+                      record.ptpStatus === 'honored' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {record.ptpStatus ? record.ptpStatus.replace('_', ' ') : 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <p className="text-amber-900 font-medium">₹{Number(record.ptpAmount || 0).toLocaleString()} <span className="text-amber-700 font-normal">by</span> {new Date(record.ptpDate).toLocaleDateString()}</p>
+                  </div>
+                  {record.ptpStatus === 'pending_review' && (
+                    <div className="flex gap-2 mt-3">
+                      <button className="flex-1 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-md hover:bg-emerald-700 transition">Confirm</button>
+                      <button className="flex-1 py-1.5 bg-white text-red-600 border border-red-200 text-xs font-medium rounded-md hover:bg-red-50 transition">Reject</button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-[var(--text-tertiary)] border border-dashed border-[var(--border)] rounded-lg p-3 text-center">
+                  No active Promise to Pay
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Center + Right: Dynamic Fields */}
@@ -184,14 +273,24 @@ export default function CaseDetailsPage() {
               {/* Core fields */}
               {[
                 { key: 'userId', label: 'User ID', value: record.userId },
+                { key: 'loanNumber', label: 'Loan Number', value: record.loanNumber },
                 { key: 'mobile', label: 'Mobile', value: record.mobile },
+                { key: 'email', label: 'Email', value: record.email },
                 { key: 'name', label: 'Name', value: record.name },
                 { key: 'product', label: 'Product', value: record.product },
-                { key: 'outstanding', label: 'Outstanding', value: `₹${Number(record.outstanding || 0).toLocaleString()}` },
-                { key: 'overdue', label: 'Overdue', value: `₹${Number(record.overdue || 0).toLocaleString()}` },
+                { key: 'outstanding', label: 'Outstanding', value: record.outstanding ? `₹${Number(record.outstanding).toLocaleString()}` : null },
+                { key: 'emiAmount', label: 'EMI Amount', value: record.emiAmount ? `₹${Number(record.emiAmount).toLocaleString()}` : null },
+                { key: 'loanAmount', label: 'Loan Amount', value: record.loanAmount ? `₹${Number(record.loanAmount).toLocaleString()}` : null },
+                { key: 'dueDate', label: 'Due Date', value: record.dueDate },
                 { key: 'currentDpd', label: 'Current DPD', value: `${record.currentDpd || 0} days` },
                 { key: 'dpdBucket', label: 'DPD Bucket', value: record.dpdBucket },
-                { key: 'employerId', label: 'Employer ID', value: record.employerId },
+                { key: 'cibilScore', label: 'CIBIL Score', value: record.cibilScore },
+                { key: 'language', label: 'Language', value: record.language },
+                { key: 'state', label: 'State', value: record.state },
+                { key: 'city', label: 'City', value: record.city },
+                { key: 'salaryDate', label: 'Salary Date', value: record.salaryDate ? `Day ${record.salaryDate}` : null },
+                { key: 'enachEnabled', label: 'E-NACH Enabled', value: record.enachEnabled != null ? (record.enachEnabled ? 'Yes' : 'No') : null },
+                { key: 'employerName', label: 'Employer', value: record.employerName },
               ].filter(f => f.value).map((field) => (
                 <div key={field.key} className="flex items-center justify-between px-5 py-3">
                   <span className="text-sm text-[var(--text-secondary)]">{field.label}</span>
@@ -210,6 +309,67 @@ export default function CaseDetailsPage() {
 
             {Object.keys(dynamicFields).length === 0 && (
               <div className="px-5 py-3 text-sm text-[var(--text-tertiary)] italic">No additional dynamic fields</div>
+            )}
+          </div>
+
+          {/* Communication Timeline */}
+          <div className="card mt-4 p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[var(--primary)]" />
+              Interaction Timeline
+            </h3>
+            
+            {interactions.length > 0 ? (
+              <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
+                {interactions.map((interaction, ix) => (
+                  <div key={interaction.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                    {/* Icon indicator */}
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                      {interaction.type === 'ptp' ? <ThumbsUp className="w-4 h-4 text-emerald-500" /> : 
+                       interaction.type === 'reply' ? <MessageSquare className="w-4 h-4 text-blue-500" /> :
+                       interaction.type === 'delivery_status' ? <CheckCircle2 className="w-4 h-4 text-gray-400" /> :
+                       interaction.type === 'invalid_contact' ? <ThumbsDown className="w-4 h-4 text-red-500" /> :
+                       <Activity className="w-4 h-4 text-indigo-500" />}
+                    </div>
+                    {/* Event Content */}
+                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] card p-4 hover:shadow-md transition">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">{interaction.type.replace('_', ' ')}</span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-500 rounded-lg uppercase">{interaction.channel}</span>
+                        </div>
+                        <time className="text-[10px] text-[var(--text-tertiary)]">{new Date(interaction.createdAt).toLocaleString()}</time>
+                      </div>
+                      
+                      {interaction.details?.deliveryStatus && (
+                        <p className="text-sm text-[var(--text-primary)] mt-1">
+                          Status: <span className="font-semibold">{interaction.details.deliveryStatus}</span>
+                        </p>
+                      )}
+                      
+                      {interaction.details?.failureReason && (
+                        <p className="text-xs text-red-600 bg-red-50 p-2 rounded mt-2">
+                          {interaction.details.failureReason}
+                        </p>
+                      )}
+                      
+                      {interaction.details?.replyContent && (
+                        <div className="text-sm text-[var(--text-secondary)] bg-gray-50 p-2.5 rounded-lg mt-2 border border-[var(--border)] relative">
+                          "{interaction.details.replyContent}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <MessageSquare className="w-5 h-5 text-gray-400" />
+                </div>
+                <p className="text-sm text-[var(--text-secondary)]">No interaction events tracked yet.</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">Wait for Webhook deliveries to populate timeline.</p>
+              </div>
             )}
           </div>
 

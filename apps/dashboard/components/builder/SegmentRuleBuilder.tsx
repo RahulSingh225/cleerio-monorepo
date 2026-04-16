@@ -87,6 +87,7 @@ export function SegmentRuleBuilder({
 }
 
 function countConditions(group: CriteriaGroup): number {
+  if (!group || !group.conditions) return 0;
   let count = 0;
   for (const cond of group.conditions) {
     if ('logic' in cond) {

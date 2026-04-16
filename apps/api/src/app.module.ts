@@ -26,6 +26,9 @@ import {
   RepaymentModule,
 } from '@platform/domain';
 import { ReportsModule } from './modules/reports/reports.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { DataPointsModule } from './data-points/data-points.module';
+import { PaymentLinksModule } from './payment-links/payment-links.module';
 
 @Module({
   imports: [
@@ -51,6 +54,9 @@ import { ReportsModule } from './modules/reports/reports.module';
     JourneysModule,
     InteractionEventsModule,
     RepaymentModule,
+    WebhooksModule,
+    DataPointsModule,
+    PaymentLinksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

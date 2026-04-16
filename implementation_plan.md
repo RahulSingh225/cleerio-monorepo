@@ -1,683 +1,657 @@
-# Cleerio v2 — Full Platform Implementation Plan
+# Cleerio v2.1 — Feedback Loop, Data Point Capture & Operational Readiness
 
-> **Goal**: Migrate from v1's DPD-bucket → workflow-rule model to v2's **Segment → Journey → Journey Steps** architecture with dynamic `criteria_jsonb`, visual builders, feedback loops, and repayment-driven re-segmentation.
-
----
-
-## Executive Summary
-
-The v2 schema introduces **5 major architectural shifts** from v1:
-
-| Concept | v1 (Current) | v2 (Target) |
-|---------|-------------|-------------|
-| **Targeting** | `dpd_bucket_configs` → `workflow_rules` | `segments` with `criteria_jsonb` → `journeys` → `journey_steps` |
-| **Rule Engine** | Static bucket-to-template mapping | Dynamic JSONB rule evaluator against `dynamic_fields` |
-| **Orchestration** | Single `comm_events` generation | Multi-step journey with delays, conditions, channel branching |
-| **Feedback** | None | `interaction_events` + `conversation_transcripts` + `call_recordings` → `segments.success_rate` |
-| **Repayment** | Missing | `repayment_syncs` → `repayment_records` → re-segmentation via Kafka |
-
-> [!IMPORTANT]
-> ### Tables Removed in v2
-> - `workflow_rules` → replaced by `journeys` + `journey_steps`
-> - `batch_runs` / `batch_errors` → replaced by `segmentation_runs`
-> - `scheduled_jobs` → replaced by `journey_steps.schedule_cron`
-> 
-> ### Tables Added in v2
-> - `segments` (with `criteria_jsonb` rule engine)
-> - `segmentation_runs` (batch tracking for segment assignment)
-> - `journeys` (segment-to-strategy binding)
-> - `journey_steps` (ordered multi-channel actions)
-> - `interaction_events` (feedback: PTP, dispute, callback)
-> - `conversation_transcripts` (IVR/voice bot transcripts)
-> - `call_recordings` (audio files with S3 URLs)
-> - `repayment_records` (individual payment entries)
-> - `ai_insights` (AI-generated recommendations)
+> **Goal**: Build the complete feedback infrastructure that captures every data point from every communication channel (SMS delivery reports, WhatsApp read/reply receipts, IVR call recordings & transcripts, payment link clicks), feeds them back into the Journey Progression engine as condition-evaluable fields, and makes both **portfolio data points** and **feedback data points** available inside the Journey Builder for granular configuration. This is the prerequisite for the future agentic AI optimization layer.
 
 ---
 
-## User Review Required
+## What We Have (Completed in Previous Phases)
 
-> [!WARNING]
-> ### Breaking Schema Changes
-> The v2 schema **removes** `workflow_rules`, `batch_runs`, `batch_errors`, and `scheduled_jobs` tables entirely. The existing "Strategy Builder" that creates `workflow_rules` will be replaced by a new **Journey Builder** that creates `journeys` + `journey_steps`. Any deployed workflow rules will need migration.
+| Layer | Status | What Exists |
+|-------|--------|-------------|
+| **Portfolio Ingestion** | ✅ | CSV upload → dynamic field mapping → `portfolio_records.dynamic_fields` |
+| **Segmentation Engine** | ✅ | `criteria_jsonb` rule evaluator, `segmentation_runs`, priority-ordered segment assignment |
+| **Journey Builder UI** | ✅ | ReactFlow canvas with 8 node types (Trigger, Wait, SMS, WhatsApp, Condition, ManualReview, EndSuccess, EndFailure) |
+| **Journey Progression** | ✅ | `JourneyProgressionService` — admission, step scheduling, condition evaluation, next-step advancement |
+| **Universal Dispatcher (BYOC)** | ✅ | `GenericDispatcherService` — resolves `dispatchApiTemplate` blueprints, fires HTTP requests to any vendor |
+| **Worker Orchestration** | ✅ | `JobQueueService` — cron polling, comm.dispatch handler, wait-step resolution |
+| **Schema** | ✅ | All 22 v2 tables including `delivery_logs`, `interaction_events`, `conversation_transcripts`, `call_recordings`, `repayment_records` |
 
-> [!IMPORTANT]
-> ### Key Design Decisions
-> 1. **Segment Rule Builder**: Will use a visual tree-renderer (nested AND/OR groups) rather than raw JSON editing. Each rule node selects a field from `tenant_field_registry`, an operator, and a value.
-> 2. **Journey Builder**: Full React Flow canvas with new node types: **Segment Trigger** → **Wait/Delay** → **Send SMS/WhatsApp/IVR** → **Condition (response check)** → **Branch**. Replaces the current 4-node builder.
-> 3. **Repayment Flow**: Upload CSV → match by `user_id` → update `portfolio_records.outstanding` → trigger re-segmentation via Kafka `repayment.sync` topic.
-> 4. **`portfolio_records` changes**: Removes `dpdBucket` and `overdue` columns. Adds `segment_id`, `last_segmented_at`, `last_repayment_at`, `total_repaid`. The `outstanding` column remains.
+---
+
+## Analysis: Stakeholder Document vs Current Schema
+
+### Document 1: Incoming Allocation Checklist
+
+This is a **lender onboarding questionnaire** — portfolio-level metadata about a new client. It contains configuration data, not per-record data.
+
+**Current gap**: Our `tenants` table only stores `name`, `code`, `status`, and a generic `settings` JSONB. The allocation checklist has **25+ structured fields** (book size, secured/unsecured split, products, target ROR, approved channels, contactability %, allocation dates, reporting cadence, etc.) that should be stored and queryable.
+
+### Document 2: Data Required for Effective Collections
+
+This is the **per-borrower data list** — 70 fields that lenders provide in their portfolio CSV. Here's the critical mapping:
+
+| # | Field | Current Storage | Status | Notes |
+|---|-------|----------------|--------|-------|
+| 1 | Name | `portfolio_records.name` | ✅ Core | |
+| 2 | Loan Number | `dynamic_fields` | ⚠️ **Should be core** | Primary identifier for lenders, used in template variables |
+| 3 | Amount Pending | `portfolio_records.outstanding` | ✅ Core | |
+| 4 | Due Date | `dynamic_fields` | ⚠️ **Should be core** | Critical for timing communications — send reminders 3 days before due date |
+| 5 | State | `dynamic_fields` | ⚠️ **Should be core** | Regional compliance, communication timing, language selection |
+| 6 | Customer Language | `dynamic_fields` | ⚠️ **Should be core** | Determines which template language variant to use |
+| 7 | Mobile | `portfolio_records.mobile` | ✅ Core | |
+| 8 | Tenure | `dynamic_fields` | ✅ Dynamic | |
+| 9 | EMI | `dynamic_fields` | ⚠️ **Should be core** | Used in every template and segmentation rule |
+| 10 | E-NACH Enabled | `dynamic_fields` | ⚠️ **Should be core** | Mandate-based vs manual payment — fundamentally different journey flows |
+| 11 | Occupation | `dynamic_fields` | ✅ Dynamic | |
+| 12 | Gender | `dynamic_fields` | ✅ Dynamic | |
+| 13 | City | `dynamic_fields` | ⚠️ **Should be core** | Regional grouping |
+| 14 | Pin Code | `dynamic_fields` | ✅ Dynamic | |
+| 15 | CIBIL Score | `dynamic_fields` | ⚠️ **Should be core** | Risk segmentation |
+| 16 | CIBIL Range | `dynamic_fields` | ✅ Dynamic | Derived from CIBIL Score |
+| 17 | Income | `dynamic_fields` | ✅ Dynamic | |
+| 18 | Marital State | `dynamic_fields` | ✅ Dynamic | |
+| 19-22 | Reference/Alternate Numbers | `dynamic_fields` | ⚠️ **Critical** | Skip tracing — try alternate numbers when primary fails |
+| 23 | Address | `dynamic_fields` | ✅ Dynamic | PII |
+| 24 | Age Bucket | `dynamic_fields` | ✅ Dynamic | |
+| 25 | Last Repayment Mode | `dynamic_fields` | ✅ Dynamic | UPI/NetBanking/Cash |
+| 26 | Product Type | `portfolio_records.product` | ✅ Core | |
+| 27 | Stab | `dynamic_fields` | ✅ Dynamic | Internal lender label |
+| 28 | Region | `dynamic_fields` | ✅ Dynamic | |
+| 29 | Loan Category | `dynamic_fields` | ✅ Dynamic | Sub-type (Express, Flexi) |
+| 30 | Payment Link | `dynamic_fields` | ⚠️ **Should be core** | Template variable + click tracking |
+| 31 | Delinquency String | `dynamic_fields` | ⚠️ **Strategic** | DPD pattern ("0,1,0,0,01,1") for behavioral segmentation |
+| 32 | Reference Relation 1 | `dynamic_fields` | ✅ Dynamic | |
+| 33 | POS Category | `dynamic_fields` | ✅ Dynamic | |
+| 34 | Delinquency Tag | `dynamic_fields` | ✅ Dynamic | (e.g. "L2M Bounce") |
+| 35 | Overdue EMIs | `dynamic_fields` | ⚠️ **Strategic** | Count of missed — affects urgency |
+| 36 | Penalty | `dynamic_fields` | ✅ Dynamic | Template variable |
+| 37 | Cashback | `dynamic_fields` | ✅ Dynamic | Incentive amount |
+| 38 | Half EMI Link | `dynamic_fields` | ⚠️ **Trackable link** | Payment tracking |
+| 39 | Employer Name | `portfolio_records.employerId` | ⚠️ Mismatch | We have `employerId` but doc says `employerName` |
+| 40 | Foreclosure Link | `dynamic_fields` | ⚠️ **Trackable link** | Payment tracking |
+| 41 | Penalty Waiver Link | `dynamic_fields` | ⚠️ **Trackable link** | Payment tracking |
+| 42 | Repeat/Fresh | `dynamic_fields` | ✅ Dynamic | |
+| 43 | Loan EMI Main | `dynamic_fields` | ✅ Dynamic | Original EMI without penalties |
+| 44 | Loan Amount | `dynamic_fields` | ⚠️ **Should be core** | Principal disbursed — used in risk calcs |
+| 45 | Age | `dynamic_fields` | ✅ Dynamic | |
+| 46 | EMIs Pending | `dynamic_fields` | ✅ Dynamic | |
+| 47 | EMIs Paid | `dynamic_fields` | ✅ Dynamic | |
+| 48 | POS | `dynamic_fields` | ✅ Dynamic | Principal Outstanding |
+| 49 | TOS | `dynamic_fields` | ✅ Dynamic | Total Outstanding |
+| 50 | Total Penalties | `dynamic_fields` | ✅ Dynamic | |
+| 51 | Last Repayment Amount | `dynamic_fields` | ✅ Dynamic | |
+| 52 | Total EMIs Paid Amount | `dynamic_fields` | ✅ Dynamic | |
+| 53 | Salary Date | `dynamic_fields` | ⚠️ **Should be core** | Schedule comms around payday |
+| 54 | Disbursal Date | `dynamic_fields` | ✅ Dynamic | |
+| 55 | Last Repayment Date | `portfolio_records.lastRepaymentAt` | ✅ Core | |
+| 56 | First EMI Date | `dynamic_fields` | ✅ Dynamic | |
+| 57 | Failed Transaction Date | `dynamic_fields` | ⚠️ **Strategic** | Mandate bounce detection |
+| 58 | Principal | `dynamic_fields` | ✅ Dynamic | |
+| 59 | Email | `dynamic_fields` | ⚠️ **Should be core** | Omni-channel outreach |
+| 60 | Last Interaction Date | System-generated | ✅ System | Maps to our `lastInteractionAt` (Phase 5.1) |
+| 61 | Last Disposition | System-generated | ✅ System | Maps to our `lastInteractionType` (Phase 5.1) |
+| 62 | Internal Risk Score | `dynamic_fields` | ⚠️ **Strategic** | Lender's own risk rating |
+| 63 | Repayment History | `dynamic_fields` | ✅ Dynamic | % on-time |
+| 64 | Relationship Tenure | `dynamic_fields` | ✅ Dynamic | |
+| 65 | Customer Source | `dynamic_fields` | ✅ Dynamic | Acquisition channel |
+| 66 | Device Type | `dynamic_fields` | ⚠️ **Strategic** | Tailor message format |
+| 67 | On-Time Pay Rate | `dynamic_fields` | ✅ Dynamic | |
+| 68 | Bounce Count | `dynamic_fields` | ⚠️ **Strategic** | Failed auto-debits count |
+| 69 | Credit Utilization | `dynamic_fields` | ✅ Dynamic | |
+| 70 | Last Repayment Mode | `dynamic_fields` | ✅ Dynamic | |
+
+### Summary of Gaps
+
+| Category | Count | Action Required |
+|----------|-------|-----------------|
+| **Already core columns** | 7 | No change needed |
+| **Should be promoted to core** | 12 | New columns on `portfolio_records` |
+| **Strategic (affect journey logic)** | 7 | Field registry enhancement + condition engine |
+| **Trackable links** | 4 | Payment link tracking system |
+| **System-generated (feedback)** | 2 | Already planned in Phase 5.1 |
+| **Fine as dynamic_fields** | 38 | Already works — just need template + condition access |
+| **Portfolio-level (allocation checklist)** | 25+ | New `portfolio_configs` table |
 
 ---
 
 ## Proposed Changes
 
-### Phase 1 — Schema Migration & Foundation
+### Phase 5.0 — Portfolio Data Foundation (NEW — Before Feedback)
+
+This phase ensures the system can properly ingest, store, and leverage all 70 stakeholder data points.
 
 ---
 
-#### [MODIFY] [schema.ts](file:///d:/git%20repo/cleerio-monorepo/libs/drizzle/schema.ts)
+#### [MODIFY] [schema.ts](file:///Users/spacempact/Desktop/git/cleerio-monorepo/libs/drizzle/schema.ts) — `portfolio_records`
 
-**Major rewrite** of the Drizzle schema to match the new v2 SQL. Changes include:
+**Promote 12 strategic fields to first-class core columns:**
 
-1. **Remove**: `workflowRules`, `batchRuns`, `batchErrors`, `scheduledJobs` tables
-2. **Add**: `segments`, `segmentationRuns`, `journeys`, `journeySteps`, `interactionEvents`, `conversationTranscripts`, `callRecordings`, `repaymentRecords`, `aiInsights` tables
-3. **Modify `portfolioRecords`**:
-   - Remove: `dpdBucket`, `overdue`, `lastSyncedAt`
-   - Add: `segmentId` (FK → segments), `lastSegmentedAt`, `lastRepaymentAt`, `totalRepaid`
-   - Change `userId` length from 50 → 100
-4. **Modify `commEvents`**:
-   - Remove: `ruleId`, `templateId`, `jobId`, `queuedAt`
-   - Add: `journeyStepId` (FK → journeySteps), `segmentId` (FK → segments), `resolvedFields`
-5. **Modify `commTemplates`**:
-   - Remove: `dpdBucket`, `version`, `approvedAt`
-6. **Modify `jobQueue`**:
-   - Remove: `maxAttempts`, `claimedBy`, `claimedAt`, `claimExpiresAt`, `lastError`, `failedAt`, `nextRetryAt`, `updatedAt`
-   - Add: `kafkaTopic`, `kafkaKey`
-   - Rename: `jobType` → `taskType`
-7. **Add `deletedAt`** soft-delete column to `tenants`, `portfolioRecords`
+```typescript
+// NEW core columns on portfolio_records
+loanNumber: varchar('loan_number', { length: 100 }),     // #2 - Primary lender reference
+email: varchar('email', { length: 255 }),                 // #59 - Omni-channel outreach
+dueDate: date('due_date'),                                // #4 - Next EMI due date
+emiAmount: numeric('emi_amount', { precision: 14, scale: 2 }),  // #9 - Fixed instalment amount
+language: varchar('language', { length: 20 }),             // #6 - Preferred language for templates
+state: varchar('state', { length: 100 }),                  // #5 - Regional compliance + timing
+city: varchar('city', { length: 100 }),                   // #13 - Regional grouping
+cibilScore: integer('cibil_score'),                       // #15 - Risk segmentation
+salaryDate: integer('salary_date'),                       // #53 - Day of month (1-31) for smart scheduling
+enachEnabled: boolean('enach_enabled'),                   // #10 - Mandate vs manual payment
+alternateNumbers: jsonb('alternate_numbers').default([]),  // #19-22 - Skip tracing array
+loanAmount: numeric('loan_amount', { precision: 14, scale: 2 }), // #44 - Principal for risk calcs
+```
+
+**Why core columns instead of dynamic_fields?**
+1. **Indexed queries**: Segmentation rules like `WHERE cibil_score < 600 AND state = 'Karnataka'` need column-level indexing
+2. **Template resolution**: `{{loan_number}}`, `{{emi_amount}}`, `{{due_date}}` are used in virtually every template
+3. **Smart scheduling**: `salary_date` and `due_date` determine optimal communication timing
+4. **Journey conditions**: `enach_enabled` fundamentally changes the journey flow (mandate bounce handling vs manual reminder)
+5. **Skip tracing**: `alternate_numbers` array enables fallback when primary mobile fails
+
+**Also rename**: `employerId` → `employerName` (varchar 255) to match stakeholder data format.
+
+**New indexes:**
+```typescript
+tenantStateIdx: index('portfolio_records_tenant_state_idx').on(t.tenantId, t.state),
+tenantCibilIdx: index('portfolio_records_tenant_cibil_idx').on(t.tenantId, t.cibilScore),
+tenantDueDateIdx: index('portfolio_records_tenant_due_date_idx').on(t.tenantId, t.dueDate),
+tenantLoanNumberIdx: index('portfolio_records_tenant_loan_number_idx').on(t.tenantId, t.loanNumber),
+tenantEmailIdx: index('portfolio_records_tenant_email_idx').on(t.tenantId, t.email),
+```
 
 ---
 
-#### [NEW] `libs/drizzle/migrations/0001_v2_schema.sql`
+#### [MODIFY] [schema.ts](file:///Users/spacempact/Desktop/git/cleerio-monorepo/libs/drizzle/schema.ts) — `tenant_field_registry`
 
-Auto-generated migration from Drizzle Kit after schema changes. Will include:
-- `ALTER TABLE portfolio_records DROP COLUMN dpd_bucket, ADD COLUMN segment_id uuid...`
-- `CREATE TABLE segments ...`
-- `CREATE TABLE journeys ...`
-- Data migration for existing `portfolio_records` (set `segment_id` to a default "Unassigned" segment)
+**Add semantic classification to the field registry:**
+
+```typescript
+// NEW columns on tenant_field_registry
+isStrategic: boolean('is_strategic').default(false),    // Fields that affect journey logic
+semanticRole: varchar('semantic_role', { length: 50 }), // 'loan_id' | 'due_date' | 'emi' | 'language' | 'contact_alt' | 'payment_link' | 'risk_score' | null
+```
+
+**Why?** When a lender uploads a CSV with header "Loan Account Number", the system needs to know this maps to the `loan_number` core column. The `semanticRole` tag enables auto-mapping during ingestion and ensures the field is routed to the correct core column.
+
+**Known semantic roles:**
+
+| Semantic Role | Maps To | Purpose |
+|--------------|---------|---------|
+| `borrower_name` | `portfolio_records.name` | Identity |
+| `primary_mobile` | `portfolio_records.mobile` | Primary contact |
+| `loan_id` | `portfolio_records.loanNumber` | Lender reference |
+| `outstanding` | `portfolio_records.outstanding` | Amount due |
+| `dpd` | `portfolio_records.currentDpd` | Days past due |
+| `emi` | `portfolio_records.emiAmount` | Instalment amount |
+| `due_date` | `portfolio_records.dueDate` | Next EMI date |
+| `language` | `portfolio_records.language` | Template language |
+| `state` | `portfolio_records.state` | Region |
+| `city` | `portfolio_records.city` | Region |
+| `cibil_score` | `portfolio_records.cibilScore` | Risk |
+| `salary_date` | `portfolio_records.salaryDate` | Scheduling |
+| `enach` | `portfolio_records.enachEnabled` | Mandate status |
+| `email` | `portfolio_records.email` | Omni-channel |
+| `product` | `portfolio_records.product` | Product type |
+| `employer` | `portfolio_records.employerName` | Employer |
+| `loan_amount` | `portfolio_records.loanAmount` | Principal |
+| `alt_number_1` | `portfolio_records.alternateNumbers[0]` | Skip tracing |
+| `alt_number_2` | `portfolio_records.alternateNumbers[1]` | Skip tracing |
+| `ref_number_1` | `portfolio_records.alternateNumbers[2]` | Skip tracing |
+| `ref_number_2` | `portfolio_records.alternateNumbers[3]` | Skip tracing |
+| `payment_link` | `dynamic_fields.paymentLink` (+ tracked) | Click tracking |
+| `half_emi_link` | `dynamic_fields.halfEmiLink` (+ tracked) | Click tracking |
+| `foreclosure_link` | `dynamic_fields.foreclosureLink` (+ tracked) | Click tracking |
+| `penalty_waiver_link` | `dynamic_fields.penaltyWaiverLink` (+ tracked) | Click tracking |
 
 ---
 
-### Phase 2 — Backend: Segments & Segmentation Engine
+#### [NEW] `libs/drizzle/schema.ts` — `portfolio_configs` table
+
+**Allocation checklist data stored per portfolio:**
+
+```typescript
+export const portfolioConfigs = pgTable('portfolio_configs', {
+  id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  portfolioId: uuid('portfolio_id').references(() => portfolios.id),
+  
+  // From Allocation Checklist
+  lenderName: varchar('lender_name', { length: 255 }),
+  totalBookSize: numeric('total_book_size', { precision: 14, scale: 2 }),
+  securedUnsecuredSplit: varchar('secured_unsecured_split', { length: 20 }),
+  primaryProducts: jsonb('primary_products').default([]),      // ['STPL', 'HTPL', 'Business Loan']
+  monthlyInflow: numeric('monthly_inflow', { precision: 14, scale: 2 }),
+  currentDpdStock: numeric('current_dpd_stock', { precision: 14, scale: 2 }),
+  currentEfficiency: numeric('current_efficiency', { precision: 5, scale: 2 }),
+  targetEfficiency: numeric('target_efficiency', { precision: 5, scale: 2 }),
+  targetRor: numeric('target_ror', { precision: 5, scale: 2 }),
+  currentContactability: numeric('current_contactability', { precision: 5, scale: 2 }),
+  approvedChannels: jsonb('approved_channels').default([]),     // ['sms', 'whatsapp', 'ivr']
+  allocationStartDate: date('allocation_start_date'),
+  allocationEndDate: date('allocation_end_date'),
+  paidFileFrequency: varchar('paid_file_frequency', { length: 20 }), // 'daily' | 'weekly'
+  waiverGrid: jsonb('waiver_grid').default({}),
+  currentAcr: numeric('current_acr', { precision: 8, scale: 2 }),
+  commercialsModel: varchar('commercials_model', { length: 50 }),
+  reportingFrequency: varchar('reporting_frequency', { length: 20 }),
+  expectedRegionSplit: jsonb('expected_region_split').default({}), // { south: 50, north: 30, east: 10, west: 10 }
+  stakeholderGoals: jsonb('stakeholder_goals').default({}),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+```
 
 ---
 
-#### [NEW] `libs/domain/src/modules/segments/segments.service.ts`
+#### [MODIFY] `libs/domain/src/modules/portfolios/portfolios.service.ts`
 
-Full CRUD service for segments:
-- `create(data)` — validate `criteria_jsonb` structure, enforce unique `(tenant_id, code)`
-- `findAll(tenantId)` — list with record count per segment
-- `findById(id)` — with success_rate stats
-- `update(id, data)` — update criteria, auto-trigger re-segmentation
-- `delete(id)` — soft delete, reassign records to default segment
-- `getDefaultSegment(tenantId)` — auto-create "Others" segment if not exists
-- `evaluateCriteria(criteria, dynamicFields)` — **JSONB rule evaluator** that supports:
-  - Operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `not_in`, `contains`, `between`
-  - Logical: `AND`, `OR` groups (nested)
-  - Field references: `field1`, `field2`, ..., `fieldN` + core fields (`current_dpd`, `outstanding`, etc.)
+**Enhance the ingestion pipeline to auto-map semantic roles:**
 
-**criteria_jsonb format:**
-```json
-{
-  "logic": "AND",
-  "conditions": [
-    { "field": "current_dpd", "operator": "between", "value": [31, 60] },
-    { "field": "outstanding", "operator": "gte", "value": 5000 },
-    {
-      "logic": "OR",
-      "conditions": [
-        { "field": "field3", "operator": "eq", "value": "personal_loan" },
-        { "field": "field3", "operator": "eq", "value": "credit_card" }
-      ]
-    }
-  ]
+During CSV upload, when mapping columns to `tenant_field_registry`, the system should:
+1. Auto-detect known headers (fuzzy match "Loan Number" → `loanNumber`, "Amount Pending" → `outstanding`, etc.)
+2. Route fields with `semanticRole` to the correct core column during record insertion
+3. Store all remaining fields in `dynamic_fields` as before
+
+**Header Fuzzy Match Table (built-in):**
+
+| CSV Header Variations | Semantic Role |
+|-----------------------|---------------|
+| `Name`, `Borrower Name`, `Customer Name`, `Full Name` | `borrower_name` |
+| `Loan Number`, `Loan No`, `Account Number`, `Loan Account`, `Loan ID` | `loan_id` |
+| `Mobile`, `Phone`, `Contact Number`, `Mobile Number`, `Phone Number` | `primary_mobile` |
+| `Amount Pending`, `Outstanding`, `Balance`, `Total Due`, `POS`, `TOS` | `outstanding` |
+| `DPD`, `Days Past Due`, `Current DPD` | `dpd` |
+| `EMI`, `Instalment`, `EMI Amount`, `Monthly Instalment` | `emi` |
+| `Due Date`, `EMI Due Date`, `Next Due Date`, `Payment Due Date` | `due_date` |
+| `Language`, `Customer Language`, `Preferred Language` | `language` |
+| `State`, `State Of Residence` | `state` |
+| `City`, `City Of Residence` | `city` |
+| `CIBIL Score`, `Credit Score`, `CIBIL`, `Bureau Score` | `cibil_score` |
+| `Salary Date`, `Salary Credit Date`, `Pay Day` | `salary_date` |
+| `E-Nach Enabled`, `NACH`, `Auto Debit`, `Mandate`, `eNACH` | `enach` |
+| `Email`, `Email ID`, `Email Address` | `email` |
+| `Product`, `Product Type`, `Loan Product` | `product` |
+| `Employer`, `Employer Name`, `Company`, `Organisation` | `employer` |
+| `Loan Amount`, `Disbursed Amount`, `Principal`, `Sanctioned Amount` | `loan_amount` |
+| `Payment Link`, `Pay Link`, `UPI Link` | `payment_link` |
+| `Alt Number`, `Alternate Number`, `Secondary Mobile` | `alt_number_1` |
+| `Reference Number`, `Ref Number`, `Emergency Contact` | `ref_number_1` |
+
+---
+
+#### [MODIFY] `apps/dashboard/app/cases/upload/page.tsx`
+
+**Enhance the field mapping step to show semantic role suggestions:**
+
+When the user maps CSV columns, the UI should:
+- Auto-suggest semantic roles based on fuzzy header matching
+- Show a badge next to auto-detected fields: "🔗 Auto-mapped to `Loan Number`"
+- Allow override if the suggestion is wrong
+- Highlight unmapped strategic fields in amber: "⚠️ `Due Date` not mapped — this field enables smart scheduling"
+
+---
+
+### Phase 5.0.1 — Paid File (Daily Repayment) Pipeline
+
+The allocation checklist specifies **"Paid File Frequency: Daily"**. The system needs automated daily repayment ingestion.
+
+---
+
+#### [MODIFY] `libs/domain/src/modules/repayment/repayment.service.ts`
+
+**Enhance to support:**
+1. **Scheduled upload**: SFTP/API pull or manual CSV drop
+2. **Match by `loanNumber`** (from Doc 2 field #2), not just `userId`
+3. **Track repayment source**: Map field #25 "Last Repayment Mode" (UPI, Net Banking, Cash)
+4. **Auto re-segmentation**: After daily paid file processing, automatically trigger segmentation run
+5. **Outstanding delta**: Track `previousOutstanding` - `currentOutstanding` = daily collection amount
+
+---
+
+### Phase 5.1 — Schema Enhancements: Record-Level Feedback Columns
+
+These columns turn `portfolio_records` into a **360° borrower profile** that both the Journey Condition Engine and the future AI layer can query.
+
+---
+
+#### [MODIFY] [schema.ts](file:///Users/spacempact/Desktop/git/cleerio-monorepo/libs/drizzle/schema.ts)
+
+**`portfolio_records` — Add feedback summary columns:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `lastContactedAt` | `timestamp` | When was the last communication sent to this record? |
+| `lastContactedChannel` | `varchar(20)` | Which channel was used? (`sms`, `whatsapp`, `ivr`) |
+| `lastDeliveryStatus` | `varchar(30)` | Last known delivery status (`delivered`, `failed`, `read`, `replied`) |
+| `lastInteractionType` | `varchar(50)` | Last feedback type (`ptp`, `dispute`, `link_click`, `reply`, `no_response`) |
+| `lastInteractionAt` | `timestamp` | When did the last interaction happen? |
+| `ptpDate` | `date` | Promise-to-Pay date (from IVR/WhatsApp/manual) |
+| `ptpAmount` | `numeric(14,2)` | PTP amount (borrower's committed payment amount) |
+| `ptpStatus` | `varchar(20)` | `pending_review`, `confirmed`, `honored`, `broken` |
+| `contactabilityScore` | `integer` | 0–100 score based on delivery success rate across channels |
+| `preferredChannel` | `varchar(20)` | Auto-detected best channel based on delivery/read history |
+| `totalCommAttempts` | `integer` | Total communication attempts across all channels |
+| `totalCommDelivered` | `integer` | Total successfully delivered communications |
+| `totalCommRead` | `integer` | Total read/opened communications |
+| `totalCommReplied` | `integer` | Total replies received |
+| `riskBucket` | `varchar(20)` | `low_risk`, `medium_risk`, `high_risk` (from IVR analysis or AI) |
+| `feedbackSummary` | `jsonb` | Flexible bag for any additional feedback data points |
+
+**`delivery_logs` — Enhance for granular tracking:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `linkClicked` | `boolean` | Did the recipient click a link in the message? |
+| `linkClickedAt` | `timestamp` | When was the link clicked? |
+| `repliedAt` | `timestamp` | When did the recipient reply? |
+| `replyContent` | `text` | Content of the reply (WhatsApp) |
+| `failureReason` | `varchar(100)` | Human-readable failure reason (`invalid_number`, `number_not_on_whatsapp`, `template_rejected`, etc.) |
+
+**`channel_configs` — Add callback configuration:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `callbackUrl` | `text` | The webhook URL that should be registered with the vendor |
+| `callbackSecret` | `varchar(255)` | Shared secret for webhook verification |
+| `callbackPayloadMap` | `jsonb` | Mapping from vendor payload fields to our normalized fields |
+
+---
+
+### Phase 5.2 — Webhook Ingestion Layer (API)
+
+This is the **ears** of the system — every vendor callback flows through here.
+
+---
+
+#### [NEW] `apps/api/src/webhooks/webhooks.controller.ts`
+
+Public (no auth) webhook receiver endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `POST /webhooks/:tenantCode/sms/delivery` | POST | SMS delivery reports (delivered, failed, link_clicked) |
+| `POST /webhooks/:tenantCode/sms/reply` | POST | SMS reply/response (rare but some providers support) |
+| `POST /webhooks/:tenantCode/whatsapp/delivery` | POST | WhatsApp delivery status (sent, delivered, read, failed) |
+| `POST /webhooks/:tenantCode/whatsapp/reply` | POST | WhatsApp incoming message (reply text, PTP selection, etc.) |
+| `POST /webhooks/:tenantCode/ivr/status` | POST | **Boilerplate** — stores raw payload only |
+| `POST /webhooks/:tenantCode/payment/status` | POST | Payment link status (clicked, completed, abandoned) |
+
+Each endpoint:
+1. Validates the tenant code exists
+2. Validates webhook secret header (`X-Webhook-Secret`)
+3. Stores raw payload in `delivery_logs.callback_payload`
+4. Passes to `CallbackNormalizerService` → `FeedbackProcessorService`
+
+---
+
+#### [NEW] `apps/api/src/webhooks/webhooks.module.ts`
+
+NestJS module registering the controller and importing domain services.
+
+---
+
+#### [NEW] `libs/domain/src/modules/webhooks/callback-normalizer.service.ts`
+
+**The universal translator** — converts vendor-specific payloads into a standard `NormalizedCallback` shape:
+
+```typescript
+interface NormalizedCallback {
+  providerMsgId: string;
+  tenantId: string;
+  channel: 'sms' | 'whatsapp' | 'ivr' | 'voice_bot';
+  
+  deliveryStatus: 'sent' | 'delivered' | 'read' | 'failed' | 'replied';
+  deliveredAt?: Date;
+  readAt?: Date;
+  repliedAt?: Date;
+  
+  failureReason?: string;    // 'invalid_number' | 'number_not_on_whatsapp' | 'template_rejected'
+  errorCode?: string;
+  
+  linkClicked?: boolean;
+  linkClickedAt?: Date;
+  
+  replyContent?: string;     // actual reply text from WhatsApp
+  
+  // IVR specific (boilerplate)
+  callDuration?: number;
+  callStatus?: string;
+  recordingUrl?: string;
+  
+  // PTP Detection
+  ptpDetected?: boolean;
+  ptpDate?: string;
+  ptpAmount?: number;
+  
+  rawPayload: any;
 }
 ```
 
----
+**Preset Vendor Maps (shipped with system):**
 
-#### [NEW] `libs/domain/src/modules/segmentation-runs/segmentation-runs.service.ts`
-
-Worker-facing service:
-- `startRun(tenantId, portfolioId?, triggeredBy?)` → create `segmentation_runs` row
-- `processRun(runId)` — fetch all portfolio records, evaluate each against all active segments (priority-ordered), assign first match + fallback to default
-- `updateProgress(runId, processed)` — atomic counter increment
+- **MSG91 SMS**: `{ "statusField": "status", "msgIdField": "requestId", "deliveredValue": "1", "failedValue": "2" }`
+- **WATI WhatsApp**: `{ "statusField": "eventType", "msgIdField": "id", "readValue": "message_read", "deliveredValue": "message_delivered", "replyField": "text" }`
 
 ---
 
-#### [NEW] `apps/api/src/modules/segments/segments.controller.ts`
+#### [NEW] `libs/domain/src/modules/webhooks/feedback-processor.service.ts`
 
-REST endpoints:
-- `POST /v1/segments` — create segment with criteria_jsonb
-- `GET /v1/segments` — list all segments (with record counts)
-- `GET /v1/segments/:id` — segment detail with stats
-- `PUT /v1/segments/:id` — update segment
-- `DELETE /v1/segments/:id` — soft delete
-- `POST /v1/segments/run` — trigger manual segmentation run
-- `GET /v1/segmentation-runs` — list past runs with progress
+**The brain of the feedback loop** — takes `NormalizedCallback` and:
 
----
+1. **Updates `delivery_logs`**: Sets `deliveryStatus`, `deliveredAt`, `readAt`, `repliedAt`, `linkClicked`, `linkClickedAt`, `replyContent`, `failureReason`
+2. **Updates `comm_events`**: Sets status to reflect latest delivery state
+3. **Updates `portfolio_records`**: Rolls up into the summary columns (`lastDeliveryStatus`, `lastContactedChannel`, `contactabilityScore`, `totalCommDelivered`, etc.)
+4. **Creates `interaction_events`**: For meaningful interactions (PTP, reply, link_click, dispute)
+5. **PTP Detection**: Parses reply content for PTP intent (keyword matching). Detected PTPs are **flagged for manual review** (`ptpStatus: 'pending_review'`). An agent must confirm before it's applied.
+6. **Segment Reassignment Trigger**: If a feedback event matches a reassignment rule, queues a `segmentation.run` job
 
-### Phase 3 — Backend: Journeys & Journey Steps
-
----
-
-#### [NEW] `libs/domain/src/modules/journeys/journeys.service.ts`
-
-Journey lifecycle:
-- `create({ tenantId, segmentId, name, description })` — create journey bound to a segment
-- `findAll(tenantId)` — list with step counts and active status
-- `findById(id)` — include all `journey_steps` in order
-- `update(id, data)` — update name, toggle `is_active`
-- `delete(id)` — cascade delete steps
-- `activate(id)` / `deactivate(id)` — toggle with validation
-
----
-
-#### [NEW] `libs/domain/src/modules/journey-steps/journey-steps.service.ts`
-
-Step management:
-- `create({ journeyId, stepOrder, actionType, channel, templateId, delayHours, conditions })` 
-- `reorder(journeyId, stepIds[])` — bulk update `step_order`
-- `update(stepId, data)` — update conditions, template, delay
-- `delete(stepId)` — remove and reorder remaining
-
-**`action_type` values**: `send_sms`, `send_whatsapp`, `send_ivr`, `send_voice_bot`, `wait`, `condition_check`, `manual_review`
-
----
-
-#### [NEW] `apps/api/src/modules/journeys/journeys.controller.ts`
-
-REST endpoints:
-- `POST /v1/journeys` — create journey
-- `GET /v1/journeys` — list all
-- `GET /v1/journeys/:id` — detail with steps
-- `PUT /v1/journeys/:id` — update
-- `DELETE /v1/journeys/:id` — delete
-- `POST /v1/journeys/:id/steps` — add step
-- `PUT /v1/journeys/:id/steps/:stepId` — update step
-- `DELETE /v1/journeys/:id/steps/:stepId` — delete step
-- `PUT /v1/journeys/:id/steps/reorder` — reorder steps
-- `POST /v1/journeys/:id/deploy` — activate journey, validate all steps have templates
-
----
-
-### Phase 4 — Backend: Communication Dispatch & Feedback
-
----
-
-#### [MODIFY] `apps/worker/src/job-queue/job-queue.service.ts`
-
-Major rewrite:
-- Replace `handlePortfolioIngest` with new handlers:
-  - `handleSegmentationRun` — evaluate criteria_jsonb, assign segments
-  - `handleCommDispatch` — walk journey steps for a segment, create comm_events
-  - `handleFeedbackProcess` — parse webhook payloads → interaction_events
-  - `handleRepaymentSync` — match + update portfolio records
-- Fix existing bugs (BUG-01 through BUG-04)
-- Map `task_type` to handlers: `'segmentation.run'`, `'comm.dispatch'`, `'feedback.process'`, `'repayment.sync'`
-
----
-
-#### [NEW] `apps/worker/src/job-queue/providers/generic-dispatcher.service.ts`
-
-**Phase 4.1 — Bring Your Own Config (BYOC): Universal cURL Dispatcher**
-
-To make the system as abstract as possible, we will eliminate hardcoded adapters entirely. Instead of autonomously synchronizing templates via API, we will allow users to configure channels and templates manually and instruct the system on *how* to execute arbitrary HTTP APIs using a generic runner.
-
-**1. Schema Update (`channel_configs`)**:
-Add a flexible API blueprint:
-- `dispatchApiTemplate` (jsonb): A parsed structure of the user's sample cURL request. It stores how to call the vendor.
-  ```json
-  {
-    "url": "https://control.msg91.com/api/v5/flow",
-    "method": "POST",
-    "headers": { "authkey": "{{api_key}}", "content-type": "application/json" },
-    "bodyTemplate": {
-      "template_id": "{{TEMPLATE_ID}}",
-      "recipients": [ { "mobiles": "{{mobile}}", "###VAR_INJECTION###": true } ]
-    }
-  }
-  ```
-
-**2. Template Management Lifecycle (Manual Registration)**:
-Modify `comm_templates` table to handle external IDs without automatic API syncing:
-- Schema Additions: `providerTemplateId` (varchar) and `providerVariables` (jsonb).
-- **Workflow**: 
-  1. The user creates and approves the template fully inside the external provider's platform (MSG91/WATI).
-  2. The user comes to Cleerio, creates a new template, and inputs the external `template_id` into `providerTemplateId`.
-  3. The user maps vendor-specific variables to Cleerio dynamic fields (e.g., `providerVariables: [{"vendorVar": "VAR1", "systemVar": "name"}, {"vendorVar": "VAR2", "systemVar": "outstanding"}]`).
-
-**3. The Universal Dispatch Execution**:
-During `handleCommDispatch`, the generic service builds a dynamic API request for ANY vendor without needing adapter code:
-- Fetches the `dispatchApiTemplate` from `channel_configs` and the `providerTemplateId` + `providerVariables` from `comm_templates`.
-- Resolves the API Key headers from the channel config.
-- Injects the `providerTemplateId` into the `{{TEMPLATE_ID}}` placeholder in the body.
-- Generates the variable payload (e.g., `"VAR1": "Rahul", "VAR2": "1500"`) and injects it into the `###VAR_INJECTION###` node.
-- Fires a standard Javascript `fetch()` or `axios()` HTTP call to the vendor's API endpoint dynamically. Extensibility is fully achieved via configuration alone.
-
----
-
-#### [NEW] `libs/domain/src/modules/interaction-events/interaction-events.service.ts`
-
-Feedback recording:
-- `create(data)` — log PTP, dispute, callback, link reply interactions
-- `findByRecord(recordId)` — timeline of all interactions for a borrower
-- `findBySegment(segmentId)` — aggregate feedback per segment
-
----
-
-#### [NEW] `libs/domain/src/modules/repayment/repayment.service.ts`
-
-Repayment pipeline:
-- `createSync(tenantId, file, uploadedBy)` — create `repayment_syncs` row
-- `processSync(syncId)` — parse CSV, match records by `user_id`, insert `repayment_records`, update `portfolio_records.outstanding`, `total_repaid`, `last_repayment_at`
-- `triggerReSegmentation(tenantId)` — publish Kafka event `segmentation.run`
-
----
-
-#### [NEW] `apps/api/src/modules/repayment/repayment.controller.ts`
-
-- `POST /v1/repayment-syncs/upload` — upload CSV
-- `GET /v1/repayment-syncs` — list sync history
-- `GET /v1/repayment-records/:portfolioRecordId` — payment history for a borrower
-
----
-
-#### [NEW] `apps/api/src/modules/portfolios/portfolios.controller.ts`
-
-- `POST /v1/portfolios/upload` — upload portfolio CSV
-- `POST /v1/portfolios/map-fields` — map CSV columns to `tenant_field_registry`
-- `POST /v1/portfolios/ingest` — finalize mapping and trigger `portfolio.ingest` Kafka event
-
----
-
-### Phase 5 — Dashboard: Complete UI Redesign
-
-This is the largest phase. Each page will be visually rich, leveraging React Flow, tree renderers, and data visualization.
-
----
-
-#### 5.1 — Sidebar & Navigation Restructure
-
-##### [MODIFY] [sidebar.tsx](file:///d:/git%20repo/cleerio-monorepo/apps/dashboard/components/ui/sidebar.tsx)
-
-Restructured navigation groups:
-
+**Contactability Score Calculation (recalculated on every callback):**
 ```
-OPERATIONS
-├── Dashboard         → /insights          (overview metrics + live feed)
-├── Portfolio Records → /cases             (borrower search + detail)
-├── Upload Portfolio  → /cases/upload      (NEW: drag-and-drop CSV ingestion)
-
-STRATEGY
-├── Segments          → /segments          (NEW: segment list + rule builder)
-├── Journeys          → /journeys          (NEW: replaces /workflows)
-├── Templates         → /settings/templates (moved up for visibility)
-
-COMMUNICATIONS
-├── Comm Events       → /communications    (existing, enhanced)
-├── Delivery Logs     → /delivery-logs     (NEW)
-├── Interaction Feed  → /interactions      (NEW: feedback timeline)
-
-ANALYTICS
-├── Reports           → /reports           (enhanced)
-├── Repayments        → /repayments        (NEW)
-├── AI Insights       → /ai-insights       (NEW: future)
-
-CONFIGURATION
-├── Settings          → /settings          (field registry, channels, DPD buckets, opt-out)
+score = (delivered / attempts * 40) + (read / delivered * 30) + (replied / read * 30)
 ```
 
 ---
 
-#### 5.2 — Segment Management (NEW Pages)
+### Phase 5.3 — Feedback-Aware Journey Conditions
 
-##### [NEW] `apps/dashboard/app/segments/page.tsx`
-
-**Segment List Page** — Premium card grid layout:
-- Each segment displayed as a **glassmorphic card** with:
-  - Segment name, code, priority badge
-  - **Record count** (live from API)
-  - **Success rate** as a circular progress ring (animated)
-  - `criteria_jsonb` preview as human-readable rule summary (e.g., "DPD 31–60 AND Outstanding ≥ ₹5,000")
-  - Active/inactive toggle switch
-  - Quick actions: Edit, Clone, Delete
-- **Top metrics row**: Total segments, Avg success rate, Records unassigned, Last run time
-- "Create Segment" button → opens `/segments/new`
-
-##### [NEW] `apps/dashboard/app/segments/[id]/page.tsx`
-
-**Segment Detail Page**:
-- Header with segment stats (record count, success rate trend, linked journeys)
-- **Criteria Visualizer**: Tree view of the criteria_jsonb rules (expandable groups)
-- **Linked Journeys** section showing active journeys for this segment
-- **Records Table**: Paginated list of portfolio records in this segment
-- **Performance Chart**: Success rate over time (line chart with CSS gradients)
-
-##### [NEW] `apps/dashboard/app/segments/new/page.tsx` + `apps/dashboard/app/segments/[id]/edit/page.tsx`
-
-**Segment Rule Builder** — The crown jewel visual builder:
-
-**Tree-based rule renderer** (custom component, not React Flow):
-- Root node: `AND` / `OR` toggle
-- Each condition row: `[Field Dropdown]` `[Operator]` `[Value Input]`
-  - Field dropdown populated from `tenant_field_registry` + core fields
-  - Operator auto-adjusts based on field `data_type` (string → eq/contains, number → gt/lt/between, etc.)
-  - Value input can be text, number, date, or multi-select
-- **Nested groups**: "Add Group" button creates child AND/OR groups (indent + left border visual)
-- **Live preview panel**: Shows JSON output + simulated match count ("~1,247 records would match")
-- **Drag-to-reorder** conditions within a group
-- Color-coded by depth level (blue → purple → teal → orange)
-- Animated add/remove transitions
-
-##### [NEW] `apps/dashboard/components/builder/SegmentRuleBuilder.tsx`
-
-Core component:
-```
-<SegmentRuleBuilder
-  fieldRegistry={fields}
-  initialCriteria={segment?.criteria_jsonb}
-  onChange={(criteria) => setCriteria(criteria)}
-  showPreview={true}
-  tenantId={tenantId}
-/>
-```
-
-##### [NEW] `apps/dashboard/components/builder/RuleGroup.tsx`
-
-Recursive group renderer:
-- AND/OR toggle with animated pill switch
-- Condition rows with inline editing
-- "Add Condition" / "Add Group" buttons
-- Delete button per condition/group
-- Depth-based left border colors
-
-##### [NEW] `apps/dashboard/components/builder/RuleCondition.tsx`
-
-Single condition row:
-- Field selector (searchable dropdown with field type badges)
-- Operator selector (context-aware based on data type)
-- Value input (smart: number slider for dpd, currency format for amounts, dropdown for known enums)
+The condition nodes in the Journey Builder must evaluate **both** portfolio fields (all 70 from Doc 2) and feedback data points.
 
 ---
 
-#### 5.3 — Journey Builder (Complete Redesign of /workflows)
+#### [MODIFY] [journey-progression.service.ts](file:///Users/spacempact/Desktop/git/cleerio-monorepo/libs/domain/src/modules/journeys/journey-progression.service.ts)
 
-##### [MODIFY → REPLACE] `apps/dashboard/app/workflows/page.tsx` → [NEW] `apps/dashboard/app/journeys/page.tsx`
+**Enhance `evaluateStepCondition` to support:**
 
-**Journey List Page**:
-- Card grid showing each journey with:
-  - Journey name, description
-  - Linked segment name (with color badge)
-  - Step count, channel badges (SMS 💬, WhatsApp 📱, IVR 📞)
-  - Active/inactive status with toggle
-  - Success metric display
-  - Quick: Edit, Clone, Activate/Deactivate
-- Filters: by segment, active/inactive, channel
+1. **All core columns**: `name`, `mobile`, `outstanding`, `currentDpd`, `product`, `loanNumber`, `emiAmount`, `dueDate`, `language`, `state`, `city`, `cibilScore`, `salaryDate`, `enachEnabled`, `loanAmount`, `email`
+2. **All dynamic fields**: `field1`–`fieldN` (the remaining ~50 CSV fields like tenure, occupation, gender, etc.)
+3. **All feedback fields**: `lastDeliveryStatus`, `lastInteractionType`, `ptpDate`, `ptpStatus`, `contactabilityScore`, `riskBucket`, `totalCommAttempts`, `preferredChannel`
+4. **Step-relative fields**: `step[N].deliveryStatus`, `step[N].linkClicked`, `step[N].replied`
 
-##### [NEW] `apps/dashboard/app/journeys/[id]/page.tsx`
-
-**Journey Detail + Builder** — Full React Flow canvas:
-
-**New Node Types** (replacing old Bucket/Template/Channel/Delay nodes):
-
-| Node Type | Color | Icon | Function |
-|-----------|-------|------|----------|
-| `SegmentTrigger` | Emerald | Target | Entry point — displays the linked segment name + record count |
-| `WaitDelay` | Amber | Timer | Configurable delay in hours/days + repeat interval |
-| `SendMessage` | Blue | Send | Select channel (SMS/WA/IVR) + template from dropdown |
-| `ConditionCheck` | Purple | GitBranch | Check response (replied? PTP? no_response?) + branch edges |
-| `ManualReview` | Orange | UserCheck | Flag for human agent review |
-| `EndSuccess` | Green | CheckCircle | Journey completion marker |
-| `EndFailure` | Red | XCircle | Journey failure/escalation marker |
-
-**Canvas Features**:
-- **Left Panel**: Draggable node palette (cards you drag onto canvas)
-- **Right Panel**: Node configuration (slides out when a node is selected)
-  - Template previewer with variable highlighting
-  - Condition builder (response_type == 'ptp' → success path)
-  - Delay configurator with visual timeline
-- **Top Bar**: Journey name (inline editable), Save/Deploy buttons, validation status
-- **Bottom Panel**: Mini timeline view showing step sequence linearly
-- **Edge labels**: Shows delay duration between nodes ("Wait 24h")
-- **Validation**: Highlights incomplete nodes in red, shows error messages
-- **Auto-layout**: Button to auto-arrange nodes in a clean flow
-
-**Serialization**: Canvas state (nodes + edges) → `journey_steps` records with proper `step_order`, `action_type`, `channel`, `template_id`, `delay_hours`, `conditions_jsonb`
-
-##### [NEW] `apps/dashboard/components/builder/nodes/SegmentTriggerNode.tsx`
-##### [NEW] `apps/dashboard/components/builder/nodes/WaitDelayNode.tsx`
-##### [NEW] `apps/dashboard/components/builder/nodes/SendMessageNode.tsx`
-##### [NEW] `apps/dashboard/components/builder/nodes/ConditionCheckNode.tsx`
-##### [NEW] `apps/dashboard/components/builder/nodes/ManualReviewNode.tsx`
-##### [NEW] `apps/dashboard/components/builder/nodes/EndNode.tsx`
-
-Each node component:
-- Consistent card design with colored header, icon, status indicator
-- Configurable via right-panel (no inline forms cluttering the canvas)
-- Handles on correct positions (top/bottom for vertical flow)
-- Selection state with glow effect
-- Error state with shake animation
-
-##### [NEW] `apps/dashboard/components/builder/JourneyCanvas.tsx`
-
-The React Flow wrapper:
-- Manages nodes/edges state
-- Handles serialization to/from `journey_steps` API format
-- Provides validation logic
-- Manages the right-panel slide-out for node configuration
-
-##### [NEW] `apps/dashboard/components/builder/NodeConfigPanel.tsx`
-
-Slide-out configuration panel:
-- Appears when a node is clicked
-- Dynamically renders config form based on node type
-- Template selector with live preview
-- Condition builder for branch nodes
-- Delay time picker
+**New condition operators:**
+- `has_ptp` — record has an active PTP date in the future
+- `channel_viable` — a specific channel has delivered successfully before
+- `no_response_since` — no interaction within N hours of last communication
+- `due_date_within` — due date is within N days (for pre-due-date reminders)
+- `salary_date_is` — salary date matches (for post-salary outreach)
 
 ---
 
-#### 5.4 — Enhanced Dashboard Home (`/insights`)
-
-##### [MODIFY] [page.tsx](file:///d:/git%20repo/cleerio-monorepo/apps/dashboard/app/insights/page.tsx)
-
-Redesign with v2 data model:
-- **Top Metrics**: Total Records, Total Outstanding, Active Segments, Active Journeys
-- **Segment Performance Grid**: Each segment as a card with success rate ring + trend arrow
-- **Journey Health**: Active journeys with step completion funnel (how many records at each step)
-- **Communication Heatmap**: 7-day calendar view showing send volumes by channel (CSS grid)
-- **Recent Activity Feed**: Real-time log of comm sends, interactions, repayments
-- **DPD Distribution**: Now grouped by segment (stacked bar chart)
+### Phase 5.4 — Segment Reassignment from Feedback
 
 ---
 
-#### 5.5 — Borrower Detail View Enhancement
+#### [NEW] `libs/domain/src/modules/webhooks/reassignment-rules.service.ts`
 
-##### [MODIFY] `apps/dashboard/app/cases/[id]/page.tsx`
-
-**Borrower 360° View** (the record detail page):
-- **Header**: Name, mobile, user_id, segment badge, outstanding amount
-- **Timeline Tab**: Chronological feed showing:
-  - 📤 Communications sent (channel, template, delivery status)
-  - 💬 Interactions (PTP, callbacks, disputes)
-  - 🎧 Call recordings (playable audio player)
-  - 💰 Repayments received
-  - 🔄 Segment changes
-- **Journey Progress Tab**: Visual journey step indicator showing where this record is in their active journey
-- **Financial Tab**: Outstanding trends, repayment history chart, DPD movement
-- **Dynamic Fields Tab**: All `dynamic_fields` displayed in a clean key-value grid
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| SMS delivery failed | `failureReason == 'invalid_number'` | Move to "Invalid Contact" segment |
+| All channels failed | `contactabilityScore < 10` | Move to "Unreachable" segment |
+| PTP confirmed | `ptpStatus == 'confirmed'` | Move to "PTP Active" segment |
+| PTP date passed, no repayment | `ptpDate < today && no_repayment` | Move to "PTP Broken" segment |
+| WA link clicked, no repayment | `linkClicked && daysSince(linkClickedAt) > 3` | Move to "Aware But Not Paying" |
+| Repayment received | `lastRepaymentAt != null` | Move to "Resolved" or reduce severity |
+| E-NACH bounce detected | `enachEnabled && failedTransactionDate recent` | Move to "Mandate Failure" segment |
 
 ---
 
-#### 5.6 — Portfolio Upload & Ingestion (NEW)
-
-##### [NEW] `apps/dashboard/app/cases/upload/page.tsx`
-
-**Portfolio Data Ingestion Flow**:
-- **Step 1: Upload**: Drag-and-drop area for massive CSV files (supports 1M+ rows)
-- **Step 2: Field Mapping**:
-  - Automatically attempts to map CSV headers to `tenant_field_registry`
-  - Visual two-column mapping UI to let users map unassigned columns
-  - Option to create new dynamic fields directly from this UI
-- **Step 3: Validation & Preview**: Shows first 5 rows to verify mappings
-- **Step 4: Ingestion**: Pushes job to Worker (`portfolio.ingest`), which triggers automatic initial `segmentation.run`
-
----
-
-#### 5.6 — Repayment Management (NEW)
-
-##### [NEW] `apps/dashboard/app/repayments/page.tsx`
-
-- Upload section with drag-and-drop CSV uploader
-- Sync history table with status badges (pending/processing/completed/failed)
-- Records updated counter, matched vs unmatched stats
-- "Trigger Re-segmentation" button after sync
-
-##### [NEW] `apps/dashboard/app/repayments/[syncId]/page.tsx`
-
-- Sync detail: file URL, records matched/updated
-- Individual repayment records table
-- Before/after outstanding comparison
-
----
-
-#### 5.7 — Interaction & Feedback Timeline (NEW)
-
-##### [NEW] `apps/dashboard/app/interactions/page.tsx`
-
-- **Live Feed** of all interaction events across the tenant
-- Filterable by: interaction_type, channel, segment, date range
-- Each entry shows: borrower name, type (PTP/dispute/callback), channel, conversation preview
-- Click to expand → full transcript, recording playback, AI sentiment
-
----
-
-#### 5.8 — Delivery Logs (NEW)
-
-##### [NEW] `apps/dashboard/app/delivery-logs/page.tsx`
-
-- Table view of all delivery logs
-- Provider message ID, delivery status, error codes
-- Timeline: sent → delivered → read (visual status progression)
-- Filter by provider, status, date range
-
----
-
-#### 5.9 — Reports Enhancement
-
-##### [MODIFY] `apps/dashboard/app/reports/page.tsx`
-
-Add new report types:
-- **Segment Performance Report**: Success rates, record counts, journey completion
-- **DPD Movement Report**: Records moving between segments over time
-- **Communication Log Report**: Full comm event export with delivery status
-- **Repayment Report**: Payments received, outstanding reduction
-- **Batch Error Report**: From segmentation runs
-
-Each report: configurable filters → async generation via `report_jobs` → download link
-
----
-
-#### 5.10 — Settings Reorganization
-
-##### [MODIFY] [settings/page.tsx](file:///d:/git%20repo/cleerio-monorepo/apps/dashboard/app/settings/page.tsx)
-
-Add new settings cards:
-- **Tenant Users** → `/settings/users` (NEW — full CRUD for tenant users with role assignment)
-- **DPD Buckets** → stays (still used for criteria evaluation)
-- **Segment Defaults** → global settings for default segment behavior
-
----
-
-### Phase 6 — Worker: Kafka Consumers & Background Jobs
-
----
-
-#### [MODIFY] `apps/worker/src/kafka/kafka.service.ts`
-
-New Kafka consumers for v2 topics:
-- `portfolio.ingest` → Creates segmentation run after portfolio upload
-- `segmentation.run` → Evaluates all segments against records
-- `comm.dispatch` → Walks journey steps, creates comm_events per eligible record
-- `feedback.process` → Parses provider webhooks → interaction_events
-- `repayment.sync` → Processes repayment file → updates records
-- `ai.insight` → (Phase 6 future) AI agent suggestions
-
-Each consumer:
-1. Receives message
-2. Creates `task_queue` entry
-3. Worker picks up via polling
-4. Processes with proper error handling + retry
-
----
-
-### Shared Components & Utilities
-
----
-
-#### [NEW] `apps/dashboard/components/ui/circular-progress.tsx`
-
-Animated SVG circular progress ring for segment success rates.
-
-#### [NEW] `apps/dashboard/components/ui/timeline.tsx`
-
-Vertical timeline component for borrower activity feed.
-
-#### [NEW] `apps/dashboard/components/ui/audio-player.tsx`
-
-Minimal audio player for call recordings.
-
-#### [NEW] `apps/dashboard/components/ui/drag-drop-upload.tsx`
-
-Styled drag-and-drop file upload area with progress bar.
-
-#### [NEW] `apps/dashboard/components/ui/heatmap.tsx`
-
-CSS-grid based heatmap for communication volume visualization.
-
-#### [NEW] `apps/dashboard/components/ui/funnel-chart.tsx`
-
-Step-by-step funnel visualization for journey completion rates.
-
-#### [NEW] `apps/dashboard/components/ui/rule-preview.tsx`
-
-Renders `criteria_jsonb` as human-readable rule text with syntax highlighting.
-
-#### [NEW] `apps/dashboard/components/ui/empty-state.tsx`
-
-Reusable empty state component with icon, title, description, and CTA button.
-
-#### [NEW] `apps/dashboard/lib/criteria-evaluator.ts`
-
-Client-side criteria evaluator for live preview counts during segment creation:
-```ts
-export function evaluateCriteria(
-  criteria: CriteriaGroup, 
-  record: Record<string, any>
-): boolean
-```
-
----
-
-## Open Questions
-
-> [!IMPORTANT]
-> ### Q1: Existing Data Migration
-> The current `portfolio_records` has ~1.3M records (from refine.csv). Should we:
-> - **(a)** Create a default "Unassigned" segment and assign all existing records to it?
-> - **(b)** Run the segmentation engine on existing records after creating initial segments?
-> - **(c)** Start fresh with a clean database?
-
-> [!IMPORTANT] 
-> ### Q2: Workflow Rules Migration
-> Any existing `workflow_rules` will be lost. Should we attempt to auto-convert them to `journeys` + `journey_steps`, or is a clean start fine?
-
-> [!WARNING]
-> ### Q3: React Flow Canvas Layout
-> The Journey Builder can use either:
-> - **(a)** **Top-to-bottom** vertical flow (like Zapier/n8n) — better for linear multi-step journeys
-> - **(b)** **Left-to-right** horizontal flow (like current Strategy Builder) — familiar but harder for complex branching
-> 
-> I recommend **(a) vertical top-to-bottom** for the new Journey Builder since journeys are inherently sequential with branches.
+### Phase 5.5 — IVR Boilerplate (Future-Ready)
 
 > [!NOTE]
-> ### Q4: AI Insights (Phase 6)
-> The `ai_insights` table is defined but Phase 6 (AI Layer) is marked as future (4–6 weeks after MVP). Should we:
-> - **(a)** Build the UI scaffolding now with placeholder cards?
-> - **(b)** Skip entirely until Phase 6?
+> IVR is **boilerplate only** for now. We focus on SMS and WhatsApp for testing and experimentation. The schema tables (`call_recordings`, `conversation_transcripts`) already exist. We just stub the webhook endpoint and normalizer so it's ready when an IVR provider is configured.
+
+---
+
+#### Boilerplate scope:
+- Webhook endpoint `/webhooks/:tenantCode/ivr/status` accepts POST but only stores raw payload in `delivery_logs.callback_payload`
+- No transcript parsing, no risk scoring, no recording download
+- Can be activated later by implementing the full `IvrFeedbackHandler`
+
+---
+
+### Phase 5.6 — Payment Link Tracking
+
+The stakeholder data includes **4 different link types**: Payment Link (#30), Half EMI Link (#38), Foreclosure Link (#40), Penalty Waiver Link (#41). All must be trackable.
+
+---
+
+#### [NEW] `libs/domain/src/modules/payment-links/payment-links.service.ts`
+
+1. When a template contains `{{payment_link}}`, `{{half_emi_link}}`, `{{foreclosure_link}}`, or `{{penalty_waiver_link}}`, wrap with a tracked redirect URL: `https://cleer.io/p/{shortCode}`
+2. On redirect, log a `link_click` interaction event with the record ID and link type
+3. After redirect, poll/webhook for payment completion
+
+#### [NEW] `apps/api/src/payment-links/payment-links.controller.ts`
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `GET /p/:shortCode` | GET | Redirect — tracks click, logs interaction, redirects to actual URL |
+| `POST /webhooks/:tenantCode/payment/status` | POST | Payment completion callback |
+
+---
+
+### Phase 5.7 — Journey Builder UX Enhancements
+
+---
+
+#### [MODIFY] [journeys/page.tsx](file:///Users/spacempact/Desktop/git/cleerio-monorepo/apps/dashboard/app/journeys/page.tsx)
+
+**Add new palette entries:**
+
+| Node | Icon | Purpose |
+|------|------|---------|
+| `Send IVR` | Phone | Bot call node (boilerplate — ready for future) |
+| `Check Delivery` | MailCheck | Condition checking delivery status of a previous send |
+| `Check PTP` | Calendar | Condition checking PTP existence + status |
+| `Reassign Segment` | ArrowRightLeft | Moves record to a different segment/journey |
+| `Wait For Feedback` | Clock | Waits for delivery callback (6 hour timeout) |
+
+#### [NEW] `apps/dashboard/components/builder/nodes/WaitForFeedbackNode.tsx`
+
+Pauses journey until delivery callback arrives or **6 hour timeout** expires.
+
+#### [NEW] `apps/dashboard/components/builder/nodes/ReassignSegmentNode.tsx`
+
+Moves record to a target segment, optionally triggers new journey admission.
+
+#### [NEW] `apps/dashboard/components/builder/ConditionConfigPanel.tsx`
+
+Rich condition builder with **ALL data points grouped**:
+
+- 📋 **Portfolio Fields** — name, mobile, outstanding, dpd, product, loanNumber, emiAmount, dueDate, enachEnabled, cibilScore, salaryDate, state, city, language, loanAmount, email + all dynamic fields from tenant_field_registry
+- 📨 **Delivery Data Points** — lastDeliveryStatus, lastContactedChannel, totalCommDelivered, totalCommRead
+- 💬 **Interaction Data Points** — lastInteractionType, ptpDate, ptpStatus, ptpAmount, riskBucket
+- 🔗 **Link Data Points** — linkClicked, linkClickedAt, linkType
+- 📊 **Score & Preference** — contactabilityScore, preferredChannel
+- 💰 **Repayment Data Points** — totalRepaid, lastRepaymentAt
+- ⏮️ **Previous Step Outcomes** — step[N].deliveryStatus, step[N].replied, step[N].linkClicked
+
+---
+
+### Phase 5.8 — Worker: Feedback Job Handler
+
+---
+
+#### [MODIFY] [job-queue.service.ts](file:///Users/spacempact/Desktop/git/cleerio-monorepo/apps/worker/src/job-queue/job-queue.service.ts)
+
+**Add new job type `feedback.process`:**
+
+```typescript
+case 'feedback.process':
+  await this.handleFeedbackProcess(job.payload);
+  break;
+```
+
+The handler processes normalized callbacks and:
+1. Updates `delivery_logs` with callback data
+2. Updates `portfolio_records` summary columns
+3. Creates `interaction_events` if applicable
+4. Evaluates reassignment rules
+5. If record is paused at `wait_for_feedback` step, checks if feedback satisfies wait condition and triggers `moveToNextStep`
+
+---
+
+### Phase 5.9 — Record 360° View Enhancement
+
+---
+
+#### [MODIFY] `apps/dashboard/app/cases/[id]/page.tsx`
+
+**Full borrower profile using all data points:**
+
+- **Identity Card**: Name, loan number, mobile, email, state/city, language, product, employer
+- **Financial Card**: Outstanding, EMI amount, loan amount, due date, E-NACH status, penalty, cashback
+- **Communication Timeline**: All comm events with delivery statuses (✅ Delivered, 👁️ Read, 💬 Replied, ❌ Failed)
+- **PTP Section**: Active PTP with status badge (`pending_review` / `confirmed` / `honored` / `broken`), manual review controls
+- **Contactability Card**: Score gauge, preferred channel badge, attempts vs delivery ratio
+- **Link Activity**: Click timestamps for payment/half-EMI/foreclosure/penalty-waiver links
+- **Dynamic Fields**: All remaining CSV fields in a clean key-value grid with display labels from field registry
+- **Alternate Contacts**: Reference and alternate numbers for skip tracing
+
+---
+
+### Phase 5.10 — Data Point Registry API
+
+---
+
+#### [NEW] `libs/domain/src/modules/data-points/data-points.service.ts`
+
+Returns all available fields grouped for the condition node, including:
+- All 12 new core columns from Phase 5.0
+- All dynamic fields from `tenant_field_registry` for the current tenant
+- All 16 feedback columns from Phase 5.1
+- Previous step outcomes (dynamic based on journey topology)
+
+#### [NEW] `apps/api/src/data-points/data-points.controller.ts`
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `GET /v1/data-points` | GET | Returns all available data point groups for the current tenant |
+
+---
+
+## What Stakeholders Provide vs What System Generates
+
+| Source | Data Points | Count |
+|--------|-------------|-------|
+| **Stakeholder provides (CSV upload)** | All 70 fields from Doc 2 — borrower identity, financial details, loan details, contact info | 70 |
+| **Stakeholder provides (Onboarding)** | Allocation checklist — portfolio metadata, targets, channels, reporting cadence | 25+ |
+| **Stakeholder provides (Daily)** | Paid file — repayment records, payment dates, amounts, modes | 5-8 per record |
+| **System generates (Feedback)** | Delivery statuses, read receipts, contactability score, PTP detection, link clicks | 16+ per record |
+| **System generates (Analytics)** | Segment assignments, journey progression, communication timeline, risk bucket | 10+ per record |
+
+**Total data points per borrower record: ~120+** (70 portfolio + 25 feedback + 25 system-generated)
+
+---
+
+## Resolved Decisions
+
+> [!NOTE]
+> - **Wait-For-Feedback Timeout**: **6 hours**. After 6 hours with no callback, the condition evaluates with `lastDeliveryStatus = 'no_response'`.
+> - **Contactability Score**: Recalculated **on every callback** (simple formula, single row update).
+> - **PTP Detection**: Auto-detected PTPs are **flagged for manual review** (`ptpStatus: 'pending_review'`). An agent must confirm before it's applied to the record.
+> - **IVR**: **Boilerplate only**. Focus on SMS and WhatsApp channels for now.
 
 ---
 
@@ -685,49 +659,41 @@ export function evaluateCriteria(
 
 ### Automated Tests
 
-1. **Schema Migration**:
-   ```bash
-   npx drizzle-kit generate
-   npx drizzle-kit migrate
-   ```
-   Verify all 22 tables from v2 SQL are present with correct columns.
+1. **Schema Migration**: Verify all new columns exist via `ALTER TABLE IF NOT EXISTS` migration endpoint
+2. **Callback Normalizer**: Unit test with MSG91 and WATI sample payloads
+3. **Feedback Processor**: Integration test — mock SMS delivery callback → verify `delivery_logs` + `portfolio_records` + `interaction_events` updated
+4. **PTP Detection**: Unit test with sample WhatsApp replies containing PTP keywords in English/Hindi
+5. **Condition Evaluator**: Unit test with new core fields — `cibilScore < 600 AND enachEnabled == true` should match correctly
+6. **Field Auto-Mapper**: Unit test fuzzy matching — "Loan Account Number" → `loan_id`, "Amount Pending" → `outstanding`
+7. **Contactability Score**: Unit test formula with sample data
 
-2. **Segmentation Engine**:
-   ```bash
-   # Unit test: criteria evaluator
-   npx vitest run libs/domain/src/modules/segments/criteria-evaluator.spec.ts
-   ```
-   Test cases: AND/OR nesting, all operators, edge cases (null fields, type coercion).
+### End-to-End Flow Test
 
-3. **API Endpoints**:
-   - POST/GET/PUT/DELETE for segments, journeys, journey-steps, repayment-syncs
-   - Test tenant isolation (records cannot leak between tenants)
-   - Test role-based access
-
-4. **End-to-End Flow**:
-   ```bash
-   # 1. Upload portfolio → 2. Create segment → 3. Run segmentation → 
-   # 4. Create journey → 5. Deploy → 6. Verify comm_events created
-   ```
-
-### Manual Verification / Browser Testing
-
-1. **Segment Rule Builder**: Create a complex 3-level nested rule. Verify JSON output matches expected structure. Verify live preview count is accurate.
-2. **Journey Builder**: Build a 5-step journey (Trigger → Delay → SMS → Condition → WhatsApp). Deploy. Verify `journey_steps` rows created correctly.
-3. **Borrower Timeline**: Navigate to a portfolio record. Verify chronological display of all events.
-4. **Repayment Upload**: Upload a repayment CSV. Verify `outstanding` decreases. Verify re-segmentation moves records to new segments.
-5. **Dashboard Home**: Verify all metric cards load real data, segment performance rings animate, heatmap renders.
+```
+1. Upload portfolio CSV with all 70 fields from Doc 2
+2. Verify: core fields map to columns, remaining → dynamic_fields
+3. Create segment: cibilScore < 600 AND outstanding > 5000 AND enachEnabled == false
+4. Run segmentation → verify records assigned
+5. Create journey: Trigger → Send SMS → Wait For Feedback (6h) → Condition (delivered?) → Yes: Send WA / No: Try Alternate Number
+6. Dispatch SMS → simulate DLR callback → verify progression
+7. Simulate WA reply "I will pay on 20th" → verify PTP created with status: 'pending_review'
+```
 
 ### Execution Order
 
-| Phase | Scope | Estimated Effort |
-|-------|-------|-----------------|
-| **Phase 1** | Schema migration, Drizzle rewrite | 1–2 days |
-| **Phase 2** | Segments API + segmentation engine | 2–3 days |
-| **Phase 3** | Journeys + steps API | 2 days |
-| **Phase 4** | Worker rewrite (dispatch, feedback, repayment) | 3 days |
-| **Phase 5** | Dashboard UI (all pages + components) | 5–7 days |
-| **Phase 6** | Kafka consumers + job handlers | 2 days |
+| Phase | Scope | Est. Effort |
+|-------|-------|-------------|
+| **5.0** | Portfolio data foundation (schema + auto-mapper + portfolio_configs) | 2–3 days |
+| **5.0.1** | Paid file daily pipeline enhancement | 1 day |
+| **5.1** | Feedback columns schema migration | 1 day |
+| **5.2** | Webhook controller + normalizer + processor | 2–3 days |
+| **5.3** | Feedback-aware condition engine | 1–2 days |
+| **5.4** | Segment reassignment rules | 1 day |
+| **5.5** | IVR boilerplate | 0.5 day |
+| **5.6** | Payment link tracking (4 link types) | 1 day |
+| **5.7** | Journey Builder UX (new nodes + condition panel) | 2–3 days |
+| **5.8** | Worker feedback job handler | 1 day |
+| **5.9** | Record 360° view with all data points | 1–2 days |
+| **5.10** | Data Point Registry API + UI integration | 1 day |
 
-**Total estimated effort: ~17–20 days**
-
+**Total estimated effort: ~15–20 days**

@@ -129,8 +129,8 @@ function NewSegmentPage() {
   const matchResult = useMemo(() => {
     setOverlapError(null);
     if (previewRecords.length === 0) return { matched: 0, total: 0 };
-    const hasConditions = criteria.conditions.length > 0 && 
-      criteria.conditions.some(c => 'field' in c ? (c as any).field !== '' : true);
+    const hasConditions = (criteria.conditions || []).length > 0 && 
+      (criteria.conditions || []).some(c => 'field' in c ? (c as any).field !== '' : true);
     if (!hasConditions) return { matched: 0, total: previewRecords.length };
 
     let matched = 0;
@@ -144,10 +144,22 @@ function NewSegmentPage() {
         outstanding: record.outstanding,
         total_repaid: record.totalRepaid,
         product: record.product,
-        employer_id: record.employerId,
+        employer_name: record.employerName,
         name: record.name,
         mobile: record.mobile,
         user_id: record.userId,
+        // New promoted core fields
+        loan_number: record.loanNumber,
+        email: record.email,
+        due_date: record.dueDate,
+        emi_amount: record.emiAmount,
+        language: record.language,
+        state: record.state,
+        city: record.city,
+        cibil_score: record.cibilScore,
+        salary_date: record.salaryDate,
+        enach_enabled: record.enachEnabled,
+        loan_amount: record.loanAmount,
         // Spread ALL dynamic fields — these are the extra portfolio columns
         ...(record.dynamicFields || {}),
       };

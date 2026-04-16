@@ -5,10 +5,11 @@ import {
 } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 import { evaluateCriteria, CriteriaGroup } from '../segments/segments.service';
+import { JourneyProgressionService } from '../journeys/journey-progression.service';
 
 @Injectable()
 export class SegmentationRunsService extends BaseRepository<typeof segmentationRuns> {
-  constructor() {
+  constructor(private readonly progression: JourneyProgressionService) {
     super(segmentationRuns, db);
   }
 
@@ -73,14 +74,20 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
         const criteria = seg.criteriaJsonb as CriteriaGroup;
         if (criteria && criteria.conditions && criteria.conditions.length > 0) {
           if (evaluateCriteria(criteria, record as any)) {
-            await db
-              .update(portfolioRecords)
-              .set({
-                segmentId: seg.id,
-                lastSegmentedAt: new Date(),
-                updatedAt: new Date(),
-              })
-              .where(eq(portfolioRecords.id, record.id));
+            const oldSegmentId = record.segmentId;
+            if (oldSegmentId !== seg.id) {
+              await db
+                .update(portfolioRecords)
+                .set({
+                  segmentId: seg.id,
+                  lastSegmentedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(portfolioRecords.id, record.id));
+              
+              // Admit to journey if segment changed
+              await this.progression.admitToJourney(tenantId, record.id, seg.id);
+            }
             matched = true;
             break;
           }
@@ -89,14 +96,19 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
 
       // Assign to default if no match
       if (!matched && defaultSeg) {
-        await db
-          .update(portfolioRecords)
-          .set({
-            segmentId: defaultSeg.id,
-            lastSegmentedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(portfolioRecords.id, record.id));
+        const oldSegmentId = record.segmentId;
+        if (oldSegmentId !== defaultSeg.id) {
+            await db
+            .update(portfolioRecords)
+            .set({
+                segmentId: defaultSeg.id,
+                lastSegmentedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(portfolioRecords.id, record.id));
+            
+            await this.progression.admitToJourney(tenantId, record.id, defaultSeg.id);
+        }
       }
 
       processed++;

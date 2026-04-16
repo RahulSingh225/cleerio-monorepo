@@ -80,7 +80,7 @@ export function RuleGroup({ group, fields, onChange, onDelete, depth = 0 }: Rule
 
       {/* Conditions */}
       <div className="space-y-2">
-        {group.conditions.map((cond, i) => (
+        {(group.conditions || []).map((cond, i) => (
           <div key={i}>
             {i > 0 && (
               <div className="flex items-center gap-2 py-1">

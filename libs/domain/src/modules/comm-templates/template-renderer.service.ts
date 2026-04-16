@@ -16,4 +16,27 @@ export class TemplateRendererService {
 
     return rendered;
   }
+
+  /**
+   * Recursively resolves variables in a JSON object or array.
+   */
+  renderObject(obj: any, variables: Record<string, any>): any {
+    if (typeof obj === 'string') {
+      return this.renderBody(obj, variables);
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.renderObject(item, variables));
+    }
+    
+    if (obj !== null && typeof obj === 'object') {
+      const result: Record<string, any> = {};
+      for (const key in obj) {
+        result[key] = this.renderObject(obj[key], variables);
+      }
+      return result;
+    }
+    
+    return obj;
+  }
 }
