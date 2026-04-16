@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "baseUrl": "./",
+    "paths": {
+      "@platform/common": ["./libs/common"],
+      "@platform/domain": ["./libs/domain/src"],
+      "@platform/drizzle": ["./libs/drizzle"],
+      "@platform/kafka": ["./libs/kafka"],
+      "@platform/tenant": ["./libs/tenant"],
+      "@platform/*": ["./libs/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

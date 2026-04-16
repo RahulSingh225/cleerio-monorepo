@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsArray } from 'class-validator';
 
 export class CreateTemplateDto {
   @IsNotEmpty()
@@ -17,8 +17,12 @@ export class CreateTemplateDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(50)
-  dpdBucket?: string;
+  @MaxLength(150)
+  providerTemplateId?: string;
+
+  @IsOptional()
+  @IsArray()
+  providerVariables?: Record<string, any>[];
 
   @IsOptional()
   @IsString()

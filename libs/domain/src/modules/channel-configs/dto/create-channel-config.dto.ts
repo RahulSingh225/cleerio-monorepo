@@ -1,6 +1,11 @@
-import { IsBoolean, IsOptional, IsString, IsInt, MaxLength, Min, IsObject } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsInt, MaxLength, Min, IsObject } from 'class-validator';
 
-export class UpdateChannelConfigDto {
+export class CreateChannelConfigDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  channel: string;
+
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;

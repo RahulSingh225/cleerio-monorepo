@@ -69,6 +69,84 @@ export default function JourneyBuilderPage() {
     finally { setIsLoading(false); }
   };
 
+  const editJourney = async (j: any) => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/journeys/${j.id}`);
+      const journey = res.data.data;
+      setJourneyName(journey.name);
+
+      const loadedNodes: Node[] = [];
+      const loadedEdges: Edge[] = [];
+      let currentY = 80;
+
+      // Seed start node
+      loadedNodes.push({
+        id: 'start',
+        type: 'segmentTrigger',
+        position: { x: 250, y: currentY },
+        data: { segmentId: journey.segmentId },
+      });
+      currentY += 160;
+
+      // Map steps if available
+      if (journey.steps && journey.steps.length > 0) {
+        journey.steps.sort((a: any, b: any) => a.stepOrder - b.stepOrder).forEach((step: any, index: number) => {
+          const nodeId = `step_${step.id}`;
+          
+          let nodeType = 'sendMessage';
+          if (step.actionType === 'wait') nodeType = 'waitDelay';
+          else if (step.actionType === 'condition_check') nodeType = 'conditionCheck';
+          else if (step.actionType === 'manual_review') nodeType = 'manualReview';
+
+          loadedNodes.push({
+            id: nodeId,
+            type: nodeType,
+            position: { x: 250, y: currentY },
+            data: step,
+          });
+
+          const prevId = index === 0 ? 'start' : `step_${journey.steps[index-1].id}`;
+          loadedEdges.push({
+            id: `edge_${prevId}_${nodeId}`,
+            source: prevId,
+            target: nodeId,
+            animated: true,
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+            style: { stroke: '#2D5BFF', strokeWidth: 2 }
+          });
+
+          currentY += 160;
+        });
+
+        // Add success end node automatically
+        const lastId = `step_${journey.steps[journey.steps.length-1].id}`;
+        loadedNodes.push({
+          id: 'end_success',
+          type: 'endSuccess',
+          position: { x: 250, y: currentY },
+          data: {},
+        });
+        loadedEdges.push({
+          id: `edge_${lastId}_end`,
+          source: lastId,
+          target: 'end_success',
+          animated: true,
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+          style: { stroke: '#2D5BFF', strokeWidth: 2 }
+        });
+      }
+
+      setNodes(loadedNodes);
+      setEdges(loadedEdges);
+      setBuildMode(true);
+    } catch (err) {
+      console.error('Failed to load journey details', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds: Edge[]) =>
       addEdge({
@@ -154,9 +232,10 @@ export default function JourneyBuilderPage() {
           />
         ) : (
           <div className="grid grid-cols-2 gap-4">
-            {journeys.map((j, i) => (
+            {journeys.map((j: any, i: number) => (
               <div
                 key={j.id}
+                onClick={() => editJourney(j)}
                 className="card p-5 hover:shadow-md transition-all cursor-pointer group animate-fade-in"
                 style={{ animationDelay: `${i * 60}ms` }}
               >

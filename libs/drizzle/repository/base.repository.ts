@@ -99,8 +99,18 @@ export abstract class BaseRepository<T extends AnyPgTable> {
   }
 
   async insert(data: any | any[]) {
-    // Note: In a real app, ensure tenantId is injected if missing from payload
-    // but present in context.
+    // Automatically inject tenantId if the table has a tenantId column and context exists
+    const columns = getTableColumns(this.table) as Record<string, any>;
+    const currentTenantId = this.tenantId;
+
+    if (columns['tenantId'] && currentTenantId) {
+      if (Array.isArray(data)) {
+        data = data.map((item) => ({ ...item, tenantId: item.tenantId || currentTenantId }));
+      } else {
+        data = { ...data, tenantId: data.tenantId || currentTenantId };
+      }
+    }
+
     return this._db.insert(this.table as any).values(data).returning();
   }
 

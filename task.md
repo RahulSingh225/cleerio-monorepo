@@ -1,6 +1,6 @@
-- `[/]` Update schema.ts to include dispatchApiTemplate for channels and providerTemplateId, providerVariables for templates.
-- `[ ]` Push schema changes using drizzle-kit push.
-- `[ ]` Update `apps/api/src/modules` to ensure endpoints support the new fields.
-- `[ ]` Build `/settings/channels` UI for users to paste raw cURL structures and map placeholders.
-- `[ ]` Build `/settings/templates` UI for users to create templates, map external provider IDs, and link provider fields to dynamic fields.
-- `[ ]` Verify everything runs perfectly.
+- `[x]` Update schema.ts to include dispatchApiTemplate for channels and providerTemplateId, providerVariables for templates. (Schema already updated previously)
+- `[x]` Push schema changes using drizzle-kit push. (Fixed via manual migration script)
+- `[x]` Update `apps/api/src/modules` to ensure endpoints support the new fields (Updated DTOs).
+- `[x]` Build `/settings/channels` UI for users to paste raw cURL structures/JSON and map placeholders.
+- `[x]` Build `/settings/templates` UI for users to create templates, map external provider IDs, and link provider fields to dynamic fields.
+- `[x]` Verify everything runs perfectly (Mock verified).
