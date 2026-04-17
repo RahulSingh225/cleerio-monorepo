@@ -84,10 +84,10 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
                   updatedAt: new Date(),
                 })
                 .where(eq(portfolioRecords.id, record.id));
-              
-              // Admit to journey if segment changed
-              await this.progression.admitToJourney(tenantId, record.id, seg.id);
             }
+              
+            // Always try to admit to journey (progression service handles idempotency)
+            await this.progression.admitToJourney(tenantId, record.id, seg.id);
             matched = true;
             break;
           }
@@ -106,9 +106,10 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
                 updatedAt: new Date(),
             })
             .where(eq(portfolioRecords.id, record.id));
-            
-            await this.progression.admitToJourney(tenantId, record.id, defaultSeg.id);
         }
+            
+        // Always try to admit to journey (progression service handles idempotency)
+        await this.progression.admitToJourney(tenantId, record.id, defaultSeg.id);
       }
 
       processed++;

@@ -63,7 +63,9 @@ export default function JourneyBuilderPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[]);
   const [journeyName, setJourneyName] = useState('New Journey');
+  const [currentJourneyId, setCurrentJourneyId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deploying, setDeploying] = useState(false);
 
   useEffect(() => { fetchJourneys(); }, []);
 
@@ -81,65 +83,126 @@ export default function JourneyBuilderPage() {
       const res = await api.get(`/journeys/${j.id}`);
       const journey = res.data.data;
       setJourneyName(journey.name);
+      setCurrentJourneyId(journey.id);
 
       const loadedNodes: Node[] = [];
       const loadedEdges: Edge[] = [];
-      let currentY = 80;
 
       // Seed start node
       loadedNodes.push({
         id: 'start',
         type: 'segmentTrigger',
-        position: { x: 250, y: currentY },
-        data: { segmentId: journey.segmentId },
+        position: { x: 250, y: 80 },
+        data: { 
+          segmentId: journey.segmentId,
+          segmentName: journey.segment?.name,
+          recordCount: journey.segment?.recordCount
+        },
       });
-      currentY += 160;
 
-      // Map steps if available
+      // Map steps 
+      const stepMap = new Map<string, string>(); // Original Step ID -> Node ID
+      
       if (journey.steps && journey.steps.length > 0) {
-        journey.steps.sort((a: any, b: any) => a.stepOrder - b.stepOrder).forEach((step: any, index: number) => {
+        journey.steps.forEach((step: any) => {
           const nodeId = `step_${step.id}`;
+          stepMap.set(step.id, nodeId);
           
           let nodeType = 'sendMessage';
-          if (step.actionType === 'wait') nodeType = 'waitDelay';
+          if (step.actionType === 'wait' || step.actionType === 'wait_delay') nodeType = 'waitDelay';
           else if (step.actionType === 'condition_check') nodeType = 'conditionCheck';
           else if (step.actionType === 'manual_review') nodeType = 'manualReview';
+          else if (step.actionType === 'reassign_segment') nodeType = 'reassignSegment';
+
+          // Use saved position if available
+          const savedPos = (step.conditionsJsonb as any)?.position;
+          const position = savedPos ? { x: savedPos.x, y: savedPos.y } : { x: 250, y: 80 + (step.stepOrder * 160) };
 
           loadedNodes.push({
             id: nodeId,
             type: nodeType,
-            position: { x: 250, y: currentY },
-            data: step,
+            position,
+            data: { 
+              ...step,
+              // Hydrate rules and operator for Condition nodes
+              ...(step.actionType === 'condition_check' ? { 
+                rules: step.conditionsJsonb?.rules || [],
+                operator: step.conditionsJsonb?.operator || 'AND'
+              } : {}),
+              // Hydrate target segment for Reassign nodes
+              ...(step.actionType === 'reassign_segment' ? {
+                targetSegmentId: step.conditionsJsonb?.targetSegmentId
+              } : {})
+            },
           });
-
-          const prevId = index === 0 ? 'start' : `step_${journey.steps[index-1].id}`;
-          loadedEdges.push({
-            id: `edge_${prevId}_${nodeId}`,
-            source: prevId,
-            target: nodeId,
-            animated: true,
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
-            style: { stroke: '#2D5BFF', strokeWidth: 2 }
-          });
-
-          currentY += 160;
         });
 
-        // Add success end node automatically
-        const lastId = `step_${journey.steps[journey.steps.length-1].id}`;
-        loadedNodes.push({
-          id: 'end_success',
-          type: 'endSuccess',
-          position: { x: 250, y: currentY },
-          data: {},
-        });
-        loadedEdges.push({
-          id: `edge_${lastId}_end`,
-          source: lastId,
-          target: 'end_success',
-          animated: true,
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
-          style: { stroke: '#2D5BFF', strokeWidth: 2 }
+        // Add edges based on stepOrder or nextStepId pointers
+        journey.steps.forEach((step: any, index: number) => {
+          const nodeId = `step_${step.id}`;
+          
+          // If first step, connect from start
+          if (step.stepOrder === 1) {
+            loadedEdges.push({
+              id: `edge_start_${nodeId}`,
+              source: 'start',
+              target: nodeId,
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+              style: { stroke: '#2D5BFF', strokeWidth: 2 }
+            });
+          }
+
+          // Check branches
+          const { nextStepIdYes, nextStepIdNo, nextStepId } = step.conditionsJsonb || {};
+          
+          if (nextStepIdYes && stepMap.has(nextStepIdYes)) {
+            loadedEdges.push({
+              id: `edge_${nodeId}_${stepMap.get(nextStepIdYes)}_yes`,
+              source: nodeId,
+              sourceHandle: 'yes',
+              target: stepMap.get(nextStepIdYes)!,
+              label: '✓ Yes',
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+              style: { stroke: '#2D5BFF', strokeWidth: 2 }
+            });
+          }
+          if (nextStepIdNo && stepMap.has(nextStepIdNo)) {
+            loadedEdges.push({
+              id: `edge_${nodeId}_${stepMap.get(nextStepIdNo)}_no`,
+              source: nodeId,
+              sourceHandle: 'no',
+              target: stepMap.get(nextStepIdNo)!,
+              label: '✗ No',
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+              style: { stroke: '#2D5BFF', strokeWidth: 2 }
+            });
+          }
+          if (nextStepId && stepMap.has(nextStepId)) {
+            loadedEdges.push({
+              id: `edge_${nodeId}_${stepMap.get(nextStepId)}`,
+              source: nodeId,
+              target: stepMap.get(nextStepId)!,
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+              style: { stroke: '#2D5BFF', strokeWidth: 2 }
+            });
+          }
+
+          // Fallback to sequential if no branching pointers and it's not the last step
+          if (!nextStepIdYes && !nextStepIdNo && !nextStepId && index < journey.steps.length - 1) {
+            const nextNodeId = `step_${journey.steps[index+1].id}`;
+            loadedEdges.push({
+              id: `edge_${nodeId}_${nextNodeId}`,
+              source: nodeId,
+              target: nextNodeId,
+              animated: true,
+              markerEnd: { type: MarkerType.ArrowClosed, color: '#2D5BFF' },
+              style: { stroke: '#2D5BFF', strokeWidth: 2 }
+            });
+          }
         });
       }
 
@@ -147,9 +210,133 @@ export default function JourneyBuilderPage() {
       setEdges(loadedEdges);
       setBuildMode(true);
     } catch (err) {
-      console.error('Failed to load journey details', err);
+      alert('Failed to load journey details');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveJourney = async (silent = false) => {
+    if (!silent) setSaving(true);
+    try {
+      const startNode = nodes.find(n => n.type === 'segmentTrigger');
+      if (!startNode || !startNode.data.segmentId) {
+        throw new Error('Journey must start with a Segment Trigger and have a selected segment.');
+      }
+
+      const journeyData = {
+        name: journeyName,
+        segmentId: startNode.data.segmentId,
+        isActive: false, // Default to draft when saving
+      };
+
+      let journeyId = currentJourneyId;
+      if (journeyId) {
+        await api.put(`/journeys/${journeyId}`, journeyData);
+      } else {
+        const res = await api.post('/journeys', journeyData);
+        journeyId = res.data.data.id;
+        setCurrentJourneyId(journeyId);
+      }
+
+      // Step sync logic:
+      // 1. Get all step nodes
+      const stepNodes = nodes.filter(n => !['segmentTrigger', 'endSuccess', 'endFailure'].includes(n.type!));
+      
+      // 2. Identify all current steps in DB for this journey (to clear them)
+      const currentJourney = await api.get(`/journeys/${journeyId}`);
+      if (currentJourney.data.data.steps) {
+        for (const step of currentJourney.data.data.steps) {
+          await api.delete(`/journeys/${journeyId}/steps/${step.id}`);
+        }
+      }
+
+      // 3. Create new steps (Pass 1: Create without branch pointers)
+      const nodeToStepId = new Map<string, string>();
+      for (let i = 0; i < stepNodes.length; i++) {
+        const node = stepNodes[i];
+        
+        // Build base conditions/metadata
+        const conditionsJsonb: any = {
+          position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
+        };
+
+        if (node.data.rules) {
+          conditionsJsonb.rules = node.data.rules;
+          conditionsJsonb.operator = node.data.operator || 'AND';
+        }
+
+        if (node.type === 'reassignSegment' && node.data.targetSegmentId) {
+          conditionsJsonb.targetSegmentId = node.data.targetSegmentId;
+        }
+
+        const stepPayload = {
+          stepOrder: i + 1,
+          actionType: node.type === 'waitDelay' ? 'wait' : node.type === 'conditionCheck' ? 'condition_check' : node.type === 'manualReview' ? 'manual_review' : node.type === 'reassignSegment' ? 'reassign_segment' : 'send_message',
+          channel: node.data.channel || null,
+          templateId: node.data.templateId || null,
+          delayHours: node.data.delayHours || 0,
+          conditionsJsonb,
+        };
+        const res = await api.post(`/journeys/${journeyId}/steps`, stepPayload);
+        nodeToStepId.set(node.id, res.data.data.id);
+      }
+
+      // 4. Update branch pointers (Pass 2)
+      for (const node of stepNodes) {
+        const stepId = nodeToStepId.get(node.id);
+        const nodeEdges = edges.filter(e => e.source === node.id);
+        
+        const branchData: any = {};
+        nodeEdges.forEach(edge => {
+          const targetStepId = nodeToStepId.get(edge.target);
+          if (targetStepId) {
+            if (edge.sourceHandle === 'yes') branchData.nextStepIdYes = targetStepId;
+            else if (edge.sourceHandle === 'no') branchData.nextStepIdNo = targetStepId;
+            else branchData.nextStepId = targetStepId;
+          }
+        });
+
+        if (Object.keys(branchData).length > 0) {
+          // Fetch existing to merge
+          const nodeToSave = stepNodes.find(sn => sn.id === node.id);
+          const currentConditions = {
+            position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
+            ...(nodeToSave?.data.rules ? { rules: nodeToSave.data.rules, operator: nodeToSave.data.operator || 'AND' } : {}),
+            ...(nodeToSave?.type === 'reassignSegment' ? { targetSegmentId: nodeToSave.data.targetSegmentId } : {})
+          };
+          
+          await api.put(`/journeys/${journeyId}/steps/${stepId}`, {
+            conditionsJsonb: { ...currentConditions, ...branchData }
+          });
+        }
+      }
+
+      if (!silent) alert('Journey saved successfully!');
+      return journeyId;
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to save journey');
+      return null;
+    } finally {
+      if (!silent) setSaving(false);
+    }
+  };
+
+  const handleDeploy = async () => {
+    setDeploying(true);
+    try {
+      const journeyId = await handleSaveJourney(true);
+      if (!journeyId) return;
+
+      await api.post(`/journeys/${journeyId}/deploy`);
+      alert('Journey deployed and activated!');
+      setBuildMode(false);
+      fetchJourneys();
+    } catch (err) {
+      alert('Deployment failed');
+    } finally {
+      setDeploying(false);
     }
   };
 
@@ -195,7 +382,7 @@ export default function JourneyBuilderPage() {
           subtitle="Visual journey builder for automated multi-step collection strategies."
           actions={
             <button
-              onClick={() => setBuildMode(true)}
+              onClick={() => { setBuildMode(true); setCurrentJourneyId(null); setJourneyName('New Journey'); setNodes([]); setEdges([]); }}
               className="flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm"
             >
               <Plus className="w-4 h-4" /> New Journey
@@ -228,7 +415,7 @@ export default function JourneyBuilderPage() {
             description="Create your first journey to automate multi-step collection outreach."
             action={
               <button
-                onClick={() => setBuildMode(true)}
+                onClick={() => { setBuildMode(true); setCurrentJourneyId(null); setJourneyName('New Journey'); setNodes([]); setEdges([]); }}
                 className="px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--primary-hover)] transition-colors"
               >
                 Build First Journey
@@ -301,8 +488,19 @@ export default function JourneyBuilderPage() {
           <button onClick={() => { setNodes([]); setEdges([]); }} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-[var(--border)] rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors">
             <RotateCcw className="w-3.5 h-3.5" /> Clear
           </button>
-          <button className="flex items-center gap-2 px-5 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm disabled:opacity-50" disabled={nodes.length === 0}>
-            <Rocket className="w-4 h-4" /> Deploy
+          <button 
+            onClick={() => handleSaveJourney()}
+            disabled={saving || deploying || nodes.length < 2}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-[var(--border)] rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save Draft
+          </button>
+          <button 
+            onClick={handleDeploy}
+            disabled={saving || deploying || nodes.length < 2}
+            className="flex items-center gap-2 px-5 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--primary-hover)] transition-colors shadow-sm disabled:opacity-50"
+          >
+            {deploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />} Deploy
           </button>
         </div>
       </div>

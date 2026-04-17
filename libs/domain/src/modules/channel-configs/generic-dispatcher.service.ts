@@ -96,7 +96,17 @@ export class GenericDispatcherService {
       error = err.response?.data || err.message;
     }
 
-    // 5. Update event and write log
+    // 5. Generate cURL for manual debugging
+    const headerString = Object.entries(resolvedHeaders)
+      .map(([k, v]) => `-H "${k}: ${v}"`)
+      .join(' ');
+    
+    // Ensure body is safely quoted for shell
+    const escapedBody = JSON.stringify(resolvedBody).replace(/'/g, "'\\''");
+    const bodyString = method !== 'GET' ? `-d '${escapedBody}'` : '';
+    const curlCommand = `curl -X ${method} "${resolvedUrl}" ${headerString} ${bodyString}`;
+
+    // 6. Update event and write log
     await db.update(commEvents).set({
       status: status === 'sent' ? 'sent' : 'failed',
       sentAt: status === 'sent' ? new Date() : null,
@@ -111,6 +121,17 @@ export class GenericDispatcherService {
       deliveryStatus: status,
       errorCode: error ? String((error as any).code || 'ERR') : null,
       errorMessage: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,
+      callbackPayload: {
+        request: {
+          url: resolvedUrl,
+          method,
+          headers: resolvedHeaders,
+          body: resolvedBody,
+          curl: curlCommand
+        },
+        response: response?.data || null,
+        error: error || null
+      }
     });
 
     return { status, response: response?.data };

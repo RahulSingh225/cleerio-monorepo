@@ -211,7 +211,7 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
           continue;
         }
 
-        if (['send_sms', 'send_whatsapp', 'send_ivr', 'send_voice_bot'].includes(step.actionType)) {
+        if (['send_sms', 'send_whatsapp', 'send_ivr', 'send_voice_bot', 'send_message'].includes(step.actionType)) {
           // 1. Fetch Template
           const [template] = step.templateId 
             ? await db.select().from(commTemplates).where(eq(commTemplates.id, step.templateId)).limit(1)

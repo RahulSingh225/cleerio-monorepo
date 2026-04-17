@@ -87,7 +87,7 @@ export class JourneyProgressionService {
    * Advances a record to the next step in the journey.
    */
   async moveToNextStep(tenantId: string, recordId: string, currentStepId: string) {
-    // 1. Find current step to get journeyId and stepOrder
+    // 1. Find current step
     const [currentStep] = await db
       .select()
       .from(journeySteps)
@@ -96,46 +96,65 @@ export class JourneyProgressionService {
 
     if (!currentStep) return;
 
-    // 2. Find next step
-    const [nextStep] = await db
-      .select()
-      .from(journeySteps)
-      .where(and(
-        eq(journeySteps.journeyId, currentStep.journeyId),
-        eq(journeySteps.stepOrder, currentStep.stepOrder + 1)
-      ))
-      .limit(1);
+    let nextStepId = (currentStep.conditionsJsonb as any)?.nextStepId;
+    
+    // 2. Handle Branching for Condition Checks
+    if (currentStep.actionType === 'condition_check') {
+        const [record] = await db.select().from(portfolioRecords).where(eq(portfolioRecords.id, recordId)).limit(1);
+        const conditionMet = record && this.evaluateStepCondition(currentStep.conditionsJsonb, record);
+        
+        if (conditionMet) {
+            nextStepId = (currentStep.conditionsJsonb as any)?.nextStepIdYes;
+        } else {
+            nextStepId = (currentStep.conditionsJsonb as any)?.nextStepIdNo;
+        }
+
+        if (!nextStepId) {
+            this.logger.log(`Record ${recordId} reached end of branch at Step ${currentStep.stepOrder}`);
+            return;
+        }
+    }
+
+    // 3. Find next step
+    let nextStep: any;
+    if (nextStepId) {
+        [nextStep] = await db
+          .select()
+          .from(journeySteps)
+          .where(eq(journeySteps.id, nextStepId))
+          .limit(1);
+    } else {
+        // Fallback to sequential order
+        [nextStep] = await db
+          .select()
+          .from(journeySteps)
+          .where(and(
+            eq(journeySteps.journeyId, currentStep.journeyId),
+            eq(journeySteps.stepOrder, currentStep.stepOrder + 1)
+          ))
+          .limit(1);
+    }
 
     if (!nextStep) {
       this.logger.log(`Record ${recordId} completed journey ${currentStep.journeyId}`);
       return;
     }
 
-    // 3. Handle special step types
-    if (nextStep.actionType === 'reassignSegment') {
+    // 4. Handle special step types (recursion if needed)
+    if (nextStep.actionType === 'reassign_segment') {
         const targetId = (nextStep.conditionsJsonb as any)?.targetSegmentId || (nextStep as any).targetSegmentId;
         if (targetId) {
             await this.reassignmentRules.reassignRecord(tenantId, recordId, targetId);
-            return; // Journey ends here for this record
+            return;
         }
     }
 
     if (nextStep.actionType === 'condition_check') {
-        const [record] = await db.select().from(portfolioRecords).where(eq(portfolioRecords.id, recordId)).limit(1);
-        if (record && this.evaluateStepCondition(nextStep.conditionsJsonb, record)) {
-            // Condition met, schedule THIS step (which will likely move to next immediately or be an action)
-            // For now, if it's a condition check, we might want to jump to the NEXT-NEXT step or handle it recursively
-             await this.moveToNextStep(tenantId, recordId, nextStep.id);
-             return;
-        } else {
-             // Condition not met -> Terminate or choose branch?
-             // Simplest: stop journey if condition fails for now.
-             this.logger.log(`Record ${recordId} failed condition at Step ${nextStep.stepOrder}, terminating journey.`);
-             return;
-        }
+        // Immediately evaluate next step if it's a condition check
+        return this.moveToNextStep(tenantId, recordId, nextStep.id);
     }
 
-    // 4. Schedule the next step
+    // 5. Schedule the next step
     const [journey] = await db.select({ segmentId: journeys.segmentId }).from(journeys).where(eq(journeys.id, currentStep.journeyId)).limit(1);
     await this.scheduleStep(tenantId, recordId, journey.segmentId, nextStep);
   }

@@ -106,36 +106,67 @@ export default function ChannelsPage() {
   const parseCurlToJSON = () => {
     if (!curlInput.trim()) return;
     try {
-      let extractUrl = curlInput.match(/curl\s+(?:'|")?(https?:\/\/[^\s\'\"]+)(?:'|")?/i);
-      if (!extractUrl) {
-         // Some curl formats place the URL at the end or have flags. Fallback generic match:
-         const urlMatches = curlInput.match(/https?:\/\/[^\s\'\"]+/i);
-         extractUrl = urlMatches ? urlMatches : null;
-      }
-      const url = extractUrl ? extractUrl[1] || extractUrl[0] : '';
+      // 1. Support multi-line by replacing backslashes and joining
+      // We also clean up excessive whitespace and handle the case where a backslash might have a space after it
+      const normalizedInput = curlInput
+        .replace(/\\\s*\n/g, ' ') 
+        .replace(/\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // 2. Extract URL (supports --url flag or naked URL)
+      let url = '';
+      // Try --url flag first
+      const urlFlagMatch = normalizedInput.match(/--url\s+['"]?([^'"]\S*)['"]?/i) || normalizedInput.match(/--url\s+['"]?([^'"]+)['"]?/i);
       
-      let methodMatch = curlInput.match(/-X\s+([A-Z]+)/i) || curlInput.match(/--request\s+([A-Z]+)/i);
+      if (urlFlagMatch) {
+         // If it's not quoted, we must stop at the first whitespace to avoid consuming subsequent flags
+         url = urlFlagMatch[1].split(' ')[0].trim();
+      } else {
+         // Try to find the first URL-looking string after 'curl'
+         const curlMatch = normalizedInput.match(/curl\s+(?:-X\s+[A-Z]+\s+|--request\s+[A-Z]+\s+)?['"]?([^'"]\S*)['"]?/i);
+         if (curlMatch) {
+            url = curlMatch[1].split(' ')[0].trim();
+         } else {
+            // Generic fallback for any https? link in the string
+            const genericUrl = normalizedInput.match(/https?:\/\/[^\s'"]+/i);
+            url = genericUrl ? genericUrl[0] : '';
+         }
+      }
+      
+      // Clean up any trailing backslashes if they somehow leaked in
+      url = url.replace(/\\$/, '').trim();
+      
+      // 3. Extract Method
+      let methodMatch = normalizedInput.match(/-X\s+([A-Z]+)/i) || normalizedInput.match(/--request\s+([A-Z]+)/i);
       let method = methodMatch ? methodMatch[1] : 'GET';
       
+      // 4. Extract Headers (Supports -H and --header)
       let headers: Record<string, string> = {};
-      const headerMatches = [...curlInput.matchAll(/-H\s+'([^']+)'/gi), ...curlInput.matchAll(/-H\s+"([^"]+)"/gi)];
-      headerMatches.forEach(m => {
-        const [key, ...rest] = m[1].split(':');
-        if (key && rest.length) {
-          headers[key.trim()] = rest.join(':').trim();
-        }
-      });
+      const headerRegex = /(?:-H|--header)\s+['"]([^'"]+)['"]/gi;
+      let m;
+      while ((m = headerRegex.exec(normalizedInput)) !== null) {
+          const parts = m[1].split(':');
+          if (parts.length >= 2) {
+              const key = parts[0].trim();
+              const value = parts.slice(1).join(':').trim();
+              headers[key] = value;
+          }
+      }
 
+      // 5. Extract Body (Supports -d, --data, --data-raw)
       let bodyTemplate: any = {};
-      let bodyMatch = curlInput.match(/--data(?:-raw)?\s+'([^']+)'/i) || curlInput.match(/-d\s+'([^']+)'/i) || curlInput.match(/--data(?:-raw)?\s+"([^"]+)"/i) || curlInput.match(/-d\s+"([^"]+)"/i);
+      const dataRegex = /(?:-d|--data(?:-raw)?)\s+(['"])([\s\S]*?)\1/i;
+      const dataMatch = normalizedInput.match(dataRegex);
       
-      if (bodyMatch) {
+      if (dataMatch) {
+         const rawBody = dataMatch[2];
          try {
-           bodyTemplate = JSON.parse(bodyMatch[1]);
+           bodyTemplate = JSON.parse(rawBody);
          } catch(e) {
-           bodyTemplate = bodyMatch[1]; // Fallback to raw string if not JSON
+           bodyTemplate = rawBody; // Fallback to raw string
          }
-         if (method === 'GET') method = 'POST'; // cURL implies POST when data is present natively
+         if (method === 'GET') method = 'POST';
       }
 
       const generatedTemplate = {
@@ -148,6 +179,7 @@ export default function ChannelsPage() {
       setDispatchApiTemplate(JSON.stringify(generatedTemplate, null, 2));
       setCurlInput('');
     } catch (e) {
+      console.error(e);
       alert("Could not parse cURL string correctly.");
     }
   };
