@@ -29,6 +29,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { DataPointsModule } from './data-points/data-points.module';
 import { PaymentLinksModule } from './payment-links/payment-links.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { PaymentLinksModule } from './payment-links/payment-links.module';
     WebhooksModule,
     DataPointsModule,
     PaymentLinksModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

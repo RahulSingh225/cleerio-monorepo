@@ -3,12 +3,15 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // Start the pure microservice (no HTTP listener)
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
+  // Use NestFactory.create for a hybrid application (HTTP + Microservice)
+  const app = await NestFactory.create(AppModule);
+
+  // Connect the Kafka microservice
+  app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+        brokers: [process.env.KAFKA_BROKERS || 'localhost:9092'],
       },
       consumer: {
         groupId: 'collections-worker-pool',
@@ -16,7 +19,13 @@ async function bootstrap() {
     },
   });
 
-  await app.listen();
-  console.log('Worker Microservice is listening to Kafka events & Polling DB...');
+  // Start microservices
+  await app.startAllMicroservices();
+  
+  // Start HTTP server for health checks
+  const port = process.env.WORKER_PORT ?? 3002;
+  await app.listen(port, '0.0.0.0');
+  
+  console.log(`Worker Hybrid App is listening on port ${port} (HTTP) and Kafka events...`);
 }
 bootstrap();

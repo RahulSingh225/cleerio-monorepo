@@ -1,17 +1,50 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter, ApiResponseInterceptor } from '@platform/common';
 
 async function bootstrap() {
+  // Validate critical environment variables in production
+  if (process.env.NODE_ENV === 'production') {
+    const requiredEnv = ['DATABASE_URL', 'KAFKA_BROKERS', 'JWT_SECRET'];
+    const missing = requiredEnv.filter((k) => !process.env[k]);
+    if (missing.length > 0) {
+      console.error(`❌ Missing required environment variables: ${missing.join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   const app = await NestFactory.create(AppModule);
+
+  // Security Headers
+  app.use(helmet());
+
+  // Rate Limiting
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 1000, // limit each IP to 1000 requests per windowMs
+      message: 'Too many requests from this IP, please try again after 15 minutes',
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    }),
+  );
+
   app.use(cookieParser());
-  // Allow any origin in development to support cross-network access (mobile/tablets)
+
+  // Configurable CORS
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
   app.enableCors({
     origin: (origin, callback) => {
-      // In development, we can be more permissive
-      callback(null, true);
+      // In development, or if no origins specified, allow all
+      if (!origin || process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     },
     credentials: true,
   });
@@ -30,6 +63,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
 
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  const port = process.env.API_PORT ?? 3000;
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap();

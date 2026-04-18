@@ -19,7 +19,7 @@ COPY libs/drizzle/package.json ./libs/drizzle/
 COPY libs/kafka/package.json ./libs/kafka/
 COPY libs/tenant/package.json ./libs/tenant/
 
-# Install dependencies (frozen-lockfile for consistency)
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------
@@ -56,24 +56,43 @@ RUN pnpm --filter dashboard build
 # Runtime: API
 # ---------------------------------------------------------
 FROM node:22-alpine AS api
+RUN apk add --no-cache curl
 WORKDIR /app
+
 COPY --from=api-builder /app/node_modules ./node_modules
 COPY --from=api-builder /app/apps/api/dist ./apps/api/dist
 COPY --from=api-builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=base /app/package.json ./package.json
 COPY --from=api-builder /app/libs ./libs
 
+# Ensure non-root user
+USER node
+
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/v1/health || exit 1
+
 CMD ["node", "apps/api/dist/main"]
 
 # ---------------------------------------------------------
 # Runtime: Worker
 # ---------------------------------------------------------
 FROM node:22-alpine AS worker
+RUN apk add --no-cache curl
 WORKDIR /app
+
 COPY --from=worker-builder /app/node_modules ./node_modules
 COPY --from=worker-builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=worker-builder /app/apps/worker/package.json ./apps/worker/package.json
+COPY --from=base /app/package.json ./package.json
 COPY --from=worker-builder /app/libs ./libs
+
+# Ensure non-root user
+USER node
+
+# Health check for worker (hybrid app listens on WORKER_PORT)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3002/health || exit 1
 
 CMD ["node", "apps/worker/dist/main"]
 
@@ -81,10 +100,8 @@ CMD ["node", "apps/worker/dist/main"]
 # Runtime: Dashboard
 # ---------------------------------------------------------
 FROM node:22-alpine AS dashboard
+RUN apk add --no-cache bash curl
 WORKDIR /app
-
-# Install bash for the entrypoint script
-RUN apk add --no-network --no-cache bash
 
 COPY --from=dashboard-builder /app/apps/dashboard/.next ./apps/dashboard/.next
 COPY --from=dashboard-builder /app/apps/dashboard/public ./apps/dashboard/public
@@ -95,11 +112,27 @@ COPY --from=dashboard-builder /app/node_modules ./node_modules
 RUN echo '#!/bin/bash\n\
 if [ -n "$NEXT_PUBLIC_API_URL" ]; then\n\
   echo "Replacing API URL placeholder with $NEXT_PUBLIC_API_URL..."\n\
-  # Find all JS files in .next and replace the placeholder\n\
   find apps/dashboard/.next -type f -name "*.js" -exec sed -i "s|__NEXT_PUBLIC_API_URL_PLACEHOLDER__|$NEXT_PUBLIC_API_URL|g" {} +\n\
 fi\n\
 exec node_modules/.bin/next start apps/dashboard --port 3000\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
+# Ensure non-root user (dashboards sometimes need write access to some next cache folders, but node should be fine)
+USER node
+
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:3000 || exit 1
+
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+# ---------------------------------------------------------
+# Tool: Migrator
+# ---------------------------------------------------------
+FROM base AS migrator
+COPY scripts ./scripts
+COPY drizzle ./drizzle
+COPY libs/drizzle ./libs/drizzle
+# We need tsx to run the migration script
+RUN pnpm install -g tsx
+CMD ["pnpm", "db:migrate"]

@@ -16,6 +16,7 @@ import {
   InteractionEventsModule,
   RepaymentModule,
 } from '@platform/domain';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import {
     JourneysModule,
     InteractionEventsModule,
     RepaymentModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
