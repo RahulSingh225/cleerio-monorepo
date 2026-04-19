@@ -24,6 +24,8 @@ import {
   ThumbsDown,
   Clock,
   CheckCircle2,
+  Send,
+  Globe,
 } from 'lucide-react';
 
 export default function CaseDetailsPage() {
@@ -136,18 +138,44 @@ export default function CaseDetailsPage() {
                 <span className="text-sm text-[var(--text-secondary)]">Outstanding</span>
                 <span className="text-lg font-bold text-[var(--text-primary)]">₹{Number(record.outstanding || 0).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-[var(--text-secondary)]">Overdue Amount</span>
-                <span className="text-sm font-semibold text-red-600">₹{Number(record.overdue || 0).toLocaleString()}</span>
-              </div>
+              {record.emiAmount && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">EMI Amount</span>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">₹{Number(record.emiAmount).toLocaleString()}</span>
+                </div>
+              )}
+              {record.loanAmount && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Loan Amount</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">₹{Number(record.loanAmount).toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-sm text-[var(--text-secondary)]">Current DPD</span>
                 <span className="text-sm font-semibold text-[var(--text-primary)]">{record.currentDpd || 0} days</span>
               </div>
+              {record.dueDate && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Due Date</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{new Date(record.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                </div>
+              )}
+              {record.loanNumber && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Loan Number</span>
+                  <span className="text-sm font-mono text-[var(--text-primary)]">{record.loanNumber}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-sm text-[var(--text-secondary)]">Product</span>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{record.product || '-'}</span>
               </div>
+              {record.enachEnabled != null && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">E-NACH</span>
+                  <StatusBadge label={record.enachEnabled ? 'Active' : 'Inactive'} variant={record.enachEnabled ? 'success' : 'warning'} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -177,7 +205,30 @@ export default function CaseDetailsPage() {
                   <span className="text-[var(--text-primary)]">{[record.city, record.state].filter(Boolean).join(', ')}</span>
                 </div>
               )}
+              {record.language && (
+                <div className="flex items-center gap-3">
+                  <Globe className="w-4 h-4 text-[var(--text-tertiary)]" />
+                  <span className="text-[var(--text-primary)]">Language: {record.language}</span>
+                </div>
+              )}
             </div>
+
+            {/* Alternate Numbers (skip tracing) */}
+            {record.alternateNumbers && Array.isArray(record.alternateNumbers) && record.alternateNumbers.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-[var(--border)]">
+                <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Alternate / Reference Numbers</p>
+                <div className="space-y-1.5">
+                  {record.alternateNumbers.map((num: string, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm">
+                      <Phone className="w-3 h-3 text-[var(--text-tertiary)]" />
+                      <span className="text-[var(--text-primary)]">{num}</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)] uppercase">{idx < 2 ? 'Alt' : 'Ref'} {(idx % 2) + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 mt-4">
               <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
                 <PhoneCall className="w-4 h-4" /> Call
@@ -188,12 +239,56 @@ export default function CaseDetailsPage() {
             </div>
           </div>
 
-          {/* Opt-Out Status */}
+          {/* Communication Stats */}
           <div className="card p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Communication</h3>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[var(--text-secondary)]">Opted Out (DNC)</span>
-              <StatusBadge label={record.isOptedOut ? 'Yes' : 'No'} variant={record.isOptedOut ? 'critical' : 'success'} />
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <Send className="w-4 h-4 text-[var(--primary)]" />
+              Communication Stats
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">Opted Out (DNC)</span>
+                <StatusBadge label={record.isOptedOut ? 'Yes' : 'No'} variant={record.isOptedOut ? 'critical' : 'success'} />
+              </div>
+              {record.lastDeliveryStatus && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Last Delivery</span>
+                  <StatusBadge
+                    label={record.lastDeliveryStatus}
+                    variant={record.lastDeliveryStatus === 'delivered' ? 'success' : record.lastDeliveryStatus === 'failed' ? 'critical' : 'info'}
+                  />
+                </div>
+              )}
+              {record.lastContactedChannel && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Last Channel</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)] capitalize">{record.lastContactedChannel}</span>
+                </div>
+              )}
+              {record.lastContactedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Last Contacted</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{new Date(record.lastContactedAt).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-4 gap-2 pt-2 border-t border-[var(--border)]">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-[var(--text-primary)]">{record.totalCommAttempts || 0}</p>
+                  <p className="text-[9px] text-[var(--text-tertiary)] uppercase">Sent</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-emerald-600">{record.totalCommDelivered || 0}</p>
+                  <p className="text-[9px] text-[var(--text-tertiary)] uppercase">Delivered</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-blue-600">{record.totalCommRead || 0}</p>
+                  <p className="text-[9px] text-[var(--text-tertiary)] uppercase">Read</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-violet-600">{record.totalCommReplied || 0}</p>
+                  <p className="text-[9px] text-[var(--text-tertiary)] uppercase">Replied</p>
+                </div>
+              </div>
             </div>
           </div>
 

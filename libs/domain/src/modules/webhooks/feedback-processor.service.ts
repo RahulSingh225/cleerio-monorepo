@@ -57,13 +57,39 @@ export class FeedbackProcessorService {
 
   /**
    * Step 1: Find and update delivery_logs by providerMsgId.
+   * Falls back to mobile-number matching when providerMsgId lookup fails
+   * (e.g. MSG91 Flow API doesn't return per-message IDs in its send response).
    */
   private async updateDeliveryLog(callback: NormalizedCallback) {
-    const [log] = await db
+    // Primary lookup: by providerMsgId
+    let [log] = await db
       .select()
       .from(deliveryLogs)
       .where(eq(deliveryLogs.providerMsgId, callback.providerMsgId))
       .limit(1);
+
+    // Fallback: if not found by providerMsgId AND we have a mobile number,
+    // find the most recent 'sent' delivery log for this mobile + tenant
+    if (!log && callback.mobileNumber) {
+      this.logger.debug(`providerMsgId lookup failed for "${callback.providerMsgId}", trying mobile fallback: ${callback.mobileNumber}`);
+
+      const fallbackResults = await db.execute(sql`
+        SELECT dl.* FROM delivery_logs dl
+        INNER JOIN comm_events ce ON ce.id = dl.event_id
+        INNER JOIN portfolio_records pr ON pr.id = ce.record_id
+        WHERE dl.tenant_id = ${callback.tenantId}
+          AND pr.mobile = ${callback.mobileNumber}
+          AND dl.delivery_status = 'sent'
+        ORDER BY dl.created_at DESC
+        LIMIT 1
+      `);
+
+      if (fallbackResults.rows.length > 0) {
+        const row = fallbackResults.rows[0] as any;
+        log = row;
+        this.logger.log(`Mobile fallback matched delivery log ${row.id} for mobile ${callback.mobileNumber}`);
+      }
+    }
 
     if (!log) return null;
 
@@ -71,6 +97,11 @@ export class FeedbackProcessorService {
       deliveryStatus: callback.deliveryStatus,
       callbackPayload: callback.rawPayload,
     };
+
+    // Update the providerMsgId to the callback's requestId so future callbacks can match directly
+    if (callback.providerMsgId && !callback.providerMsgId.startsWith('raw_')) {
+      updates.providerMsgId = callback.providerMsgId;
+    }
 
     if (callback.deliveredAt) updates.deliveredAt = callback.deliveredAt;
     if (callback.readAt) updates.readAt = callback.readAt;

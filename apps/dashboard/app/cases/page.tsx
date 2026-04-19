@@ -74,7 +74,7 @@ export default function CaseManagementPage() {
       render: (row: any) => (
         <div>
           <p className="font-medium text-[var(--text-primary)]">{row.name || 'Unknown'}</p>
-          <p className="text-xs text-[var(--text-tertiary)]">ID: {row.userId}</p>
+          <p className="text-xs text-[var(--text-tertiary)]">{row.loanNumber ? `Loan: ${row.loanNumber}` : `ID: ${row.userId}`}</p>
         </div>
       ),
     },
@@ -95,24 +95,39 @@ export default function CaseManagementPage() {
       ),
     },
     {
+      key: 'emiAmount',
+      header: 'EMI',
+      render: (row: any) => (
+        <span className="text-sm text-[var(--text-primary)]">
+          {row.emiAmount ? `₹${Number(row.emiAmount).toLocaleString()}` : '-'}
+        </span>
+      ),
+    },
+    {
       key: 'currentDpd',
       header: 'DPD',
       render: (row: any) => <DpdBadge days={row.currentDpd || 0} />,
     },
     {
-      key: 'dpdBucket',
-      header: 'Bucket',
+      key: 'dueDate',
+      header: 'Due Date',
       render: (row: any) => (
-        <StatusBadge
-          label={row.dpdBucket || 'Unassigned'}
-          variant={
-            row.dpdBucket?.includes('90') ? 'critical' :
-            row.dpdBucket?.includes('60') ? 'warning' :
-            row.dpdBucket?.includes('30') ? 'info' :
-            'success'
-          }
-        />
+        <span className="text-sm text-[var(--text-secondary)]">
+          {row.dueDate ? new Date(row.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-'}
+        </span>
       ),
+    },
+    {
+      key: 'lastDeliveryStatus',
+      header: 'Last Status',
+      render: (row: any) => {
+        if (!row.lastDeliveryStatus) return <span className="text-xs text-[var(--text-tertiary)]">—</span>;
+        const variant = row.lastDeliveryStatus === 'delivered' ? 'success' :
+                        row.lastDeliveryStatus === 'failed' ? 'critical' :
+                        row.lastDeliveryStatus === 'read' ? 'success' :
+                        row.lastDeliveryStatus === 'replied' ? 'info' : 'warning';
+        return <StatusBadge label={row.lastDeliveryStatus} variant={variant as any} />;
+      },
     },
     {
       key: 'mobile',

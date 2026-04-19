@@ -117,7 +117,7 @@ export class GenericDispatcherService {
       eventId: event.id,
       tenantId,
       providerName: channelConfig.providerName || channelConfig.channel,
-      providerMsgId: response?.data?.id || response?.data?.msgid || `local_${Date.now()}`,
+      providerMsgId: response?.data?.request_id || response?.data?.requestId || response?.data?.id || response?.data?.msgid || response?.data?.message || `local_${Date.now()}`,
       deliveryStatus: status,
       errorCode: error ? String((error as any).code || 'ERR') : null,
       errorMessage: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,

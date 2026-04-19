@@ -27,6 +27,9 @@ export interface NormalizedCallback {
   // Reply Content
   replyContent?: string;
 
+  // Mobile number from callback (for fallback matching)
+  mobileNumber?: string;
+
   // IVR Specific (boilerplate)
   callDuration?: number;
   callStatus?: string;
@@ -47,9 +50,20 @@ export interface NormalizedCallback {
 const VENDOR_PRESETS: Record<string, any> = {
   msg91: {
     msgIdField: 'requestId',
-    statusField: 'status',
-    statusMap: { '1': 'delivered', '2': 'failed', '3': 'delivered', '9': 'sent', '25': 'failed', '26': 'failed' },
-    failureReasonField: 'description',
+    telNumField: 'telNum',       // Mobile number for fallback matching
+    statusField: 'event',        // MSG91 sends 'event: "delivered"' — more reliable than numeric 'status'
+    statusMap: {
+      // String event names (primary — from actual callback data)
+      'delivered': 'delivered',
+      'failed': 'failed',
+      'sent': 'sent',
+      'rejected': 'failed',
+      'autorejected': 'failed',
+      'dropped': 'failed',
+      // Numeric fallbacks (legacy / some endpoints)
+      '1': 'delivered', '2': 'failed', '3': 'delivered', '9': 'sent', '25': 'failed', '26': 'failed',
+    },
+    failureReasonField: 'failureReason',  // MSG91 actual field name (was incorrectly 'description')
   },
   wati: {
     msgIdField: 'id',
@@ -184,7 +198,19 @@ export class CallbackNormalizerService {
       this.detectPtp(normalized, rawPayload.text);
     }
 
-    this.logger.debug(`Normalized callback: ${channel} → ${normalized.deliveryStatus} (msgId: ${normalized.providerMsgId})`);
+    // Extract mobile number from callback payload (for fallback matching when providerMsgId fails)
+    if (payloadMap?.telNumField) {
+      const telNum = this.extractField(rawPayload, payloadMap.telNumField);
+      if (telNum) {
+        // Normalize: ensure country code prefix (91 for India)
+        normalized.mobileNumber = telNum.startsWith('91') ? telNum : `91${telNum}`;
+      }
+    } else if (rawPayload.telNum || rawPayload.mobile || rawPayload.phone) {
+      const telNum = rawPayload.telNum || rawPayload.mobile || rawPayload.phone;
+      normalized.mobileNumber = telNum.startsWith('91') ? telNum : `91${telNum}`;
+    }
+
+    this.logger.debug(`Normalized callback: ${channel} → ${normalized.deliveryStatus} (msgId: ${normalized.providerMsgId}, mobile: ${normalized.mobileNumber || 'unknown'})`);
     return normalized;
   }
 

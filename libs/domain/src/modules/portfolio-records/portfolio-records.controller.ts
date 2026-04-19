@@ -38,14 +38,40 @@ export class PortfolioRecordsController {
 
     // Core fields always available (from portfolio_records columns)
     const coreFields = [
+      // Original core
       { key: 'current_dpd', label: 'Current DPD', dataType: 'number', isCore: true },
       { key: 'outstanding', label: 'Outstanding Amount', dataType: 'number', isCore: true },
       { key: 'total_repaid', label: 'Total Repaid', dataType: 'number', isCore: true },
       { key: 'product', label: 'Product / Loan Type', dataType: 'string', isCore: true },
-      { key: 'employer_id', label: 'Employer ID', dataType: 'string', isCore: true },
+      { key: 'employer_name', label: 'Employer Name', dataType: 'string', isCore: true },
       { key: 'name', label: 'Borrower Name', dataType: 'string', isCore: true },
       { key: 'mobile', label: 'Mobile Number', dataType: 'string', isCore: true },
       { key: 'user_id', label: 'User ID', dataType: 'string', isCore: true },
+      // Promoted core (Phase 5.0 — from stakeholder data requirements)
+      { key: 'loan_number', label: 'Loan Number', dataType: 'string', isCore: true },
+      { key: 'email', label: 'Email', dataType: 'string', isCore: true },
+      { key: 'due_date', label: 'Due Date', dataType: 'date', isCore: true },
+      { key: 'emi_amount', label: 'EMI Amount', dataType: 'number', isCore: true },
+      { key: 'language', label: 'Language', dataType: 'string', isCore: true },
+      { key: 'state', label: 'State', dataType: 'string', isCore: true },
+      { key: 'city', label: 'City', dataType: 'string', isCore: true },
+      { key: 'cibil_score', label: 'CIBIL Score', dataType: 'number', isCore: true },
+      { key: 'salary_date', label: 'Salary Date', dataType: 'number', isCore: true },
+      { key: 'enach_enabled', label: 'E-NACH Enabled', dataType: 'boolean', isCore: true },
+      { key: 'loan_amount', label: 'Loan Amount', dataType: 'number', isCore: true },
+      // Feedback summary (Phase 5.1)
+      { key: 'last_delivery_status', label: 'Last Delivery Status', dataType: 'string', isCore: true },
+      { key: 'last_contacted_channel', label: 'Last Contacted Channel', dataType: 'string', isCore: true },
+      { key: 'last_interaction_type', label: 'Last Interaction Type', dataType: 'string', isCore: true },
+      { key: 'contactability_score', label: 'Contactability Score', dataType: 'number', isCore: true },
+      { key: 'total_comm_attempts', label: 'Total Comm Attempts', dataType: 'number', isCore: true },
+      { key: 'total_comm_delivered', label: 'Total Comm Delivered', dataType: 'number', isCore: true },
+      { key: 'total_comm_read', label: 'Total Comm Read', dataType: 'number', isCore: true },
+      { key: 'total_comm_replied', label: 'Total Comm Replied', dataType: 'number', isCore: true },
+      { key: 'ptp_status', label: 'PTP Status', dataType: 'string', isCore: true },
+      { key: 'ptp_date', label: 'PTP Date', dataType: 'date', isCore: true },
+      { key: 'risk_bucket', label: 'Risk Bucket', dataType: 'string', isCore: true },
+      { key: 'preferred_channel', label: 'Preferred Channel', dataType: 'string', isCore: true },
     ];
 
     // Collect all unique dynamic field keys from sampled records
