@@ -103,19 +103,15 @@ FROM node:22-alpine AS dashboard
 RUN apk add --no-cache bash curl
 WORKDIR /app
 
-COPY --from=dashboard-builder /app/apps/dashboard/.next ./apps/dashboard/.next
-COPY --from=dashboard-builder /app/apps/dashboard/public ./apps/dashboard/public
-COPY --from=dashboard-builder /app/apps/dashboard/package.json ./apps/dashboard/package.json
-COPY --from=dashboard-builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=dashboard-builder /app/apps/dashboard/.next ./apps/dashboard/.next
+COPY --chown=node:node --from=dashboard-builder /app/apps/dashboard/public ./apps/dashboard/public
+COPY --chown=node:node --from=dashboard-builder /app/apps/dashboard/package.json ./apps/dashboard/package.json
+COPY --chown=node:node --from=dashboard-builder /app/node_modules ./node_modules
 
 # Create an entrypoint script to replace the placeholder
-RUN echo '#!/bin/bash\n\
-if [ -n "$NEXT_PUBLIC_API_URL" ]; then\n\
-  echo "Replacing API URL placeholder with $NEXT_PUBLIC_API_URL..."\n\
-  find apps/dashboard/.next -type f -name "*.js" -exec sed -i "s|__NEXT_PUBLIC_API_URL_PLACEHOLDER__|$NEXT_PUBLIC_API_URL|g" {} +\n\
-fi\n\
-exec node_modules/.bin/next start apps/dashboard --port 3000\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+RUN printf '#!/bin/bash\nif [ -n "$NEXT_PUBLIC_API_URL" ]; then\n  echo "Replacing API URL placeholder with $NEXT_PUBLIC_API_URL..."\n  find apps/dashboard/.next -type f -name "*.js" -exec sed -i "s|__NEXT_PUBLIC_API_URL_PLACEHOLDER__|${NEXT_PUBLIC_API_URL}|g" {} +\nfi\nexec node_modules/.bin/next start apps/dashboard --port 3000\n' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh && \
+    chown node:node /app/entrypoint.sh
 
 # Ensure non-root user (dashboards sometimes need write access to some next cache folders, but node should be fine)
 USER node
