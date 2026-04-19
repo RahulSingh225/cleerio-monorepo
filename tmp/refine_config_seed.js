@@ -31,16 +31,16 @@ async function seed() {
       { header: 'outstandings', label: 'outstanding', type: 'number', isCore: true },
     ];
 
-    for (let i = 0; i < mappings.length; i++) {
-      const m = mappings[i];
-      await pool.query(
-        `INSERT INTO tenant_field_registry 
-          (tenant_id, field_key, field_index, header_name, display_label, data_type, is_core)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (tenant_id, header_name) DO NOTHING`,
-        [tenantId, `field${i + 1}`, i, m.header, m.label, m.type, m.isCore]
-      );
-    }
+    // for (let i = 0; i < mappings.length; i++) {
+    //   const m = mappings[i];
+    //   await pool.query(
+    //     `INSERT INTO tenant_field_registry 
+    //       (tenant_id, field_key, field_index, header_name, display_label, data_type, is_core)
+    //      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    //      ON CONFLICT (tenant_id, header_name) DO NOTHING`,
+    //     [tenantId, `field${i + 1}`, i, m.header, m.label, m.type, m.isCore]
+    //   );
+    // }
     console.log('✅ Field mappings seeded.');
 
     // 3. Insert DPD Buckets
@@ -53,15 +53,15 @@ async function seed() {
       { name: 'Bucket >120', min: 121, max: 9999, label: '120+ DPD' },
     ];
 
-    for (const b of buckets) {
-      await pool.query(
-        `INSERT INTO dpd_bucket_configs 
-          (tenant_id, bucket_name, dpd_min, dpd_max, display_label, priority, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (tenant_id, bucket_name) DO NOTHING`,
-        [tenantId, b.name, b.min, b.max, b.label, 1, true]
-      );
-    }
+    // for (const b of buckets) {
+    //   await pool.query(
+    //     `INSERT INTO dpd_bucket_configs 
+    //       (tenant_id, bucket_name, dpd_min, dpd_max, display_label, priority, is_active)
+    //      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    //      ON CONFLICT (tenant_id, bucket_name) DO NOTHING`,
+    //     [tenantId, b.name, b.min, b.max, b.label, 1, true]
+    //   );
+    // }
     console.log('✅ DPD Buckets seeded.');
 
     const bcrypt = require('bcrypt');

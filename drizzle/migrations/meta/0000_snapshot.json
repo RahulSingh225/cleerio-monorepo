@@ -1,9 +1,119 @@
 {
-  "id": "f6cf10fd-6969-481f-a277-14542ee8243d",
+  "id": "fbf4145f-5fcd-4e81-97dd-77ae95e924ca",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.ai_insights": {
+      "name": "ai_insights",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "record_id": {
+          "name": "record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "insight_type": {
+          "name": "insight_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generated_at": {
+          "name": "generated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'ai_agent'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ai_insights_tenant_id_tenants_id_fk": {
+          "name": "ai_insights_tenant_id_tenants_id_fk",
+          "tableFrom": "ai_insights",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ai_insights_record_id_portfolio_records_id_fk": {
+          "name": "ai_insights_record_id_portfolio_records_id_fk",
+          "tableFrom": "ai_insights",
+          "tableTo": "portfolio_records",
+          "columnsFrom": [
+            "record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ai_insights_segment_id_segments_id_fk": {
+          "name": "ai_insights_segment_id_segments_id_fk",
+          "tableFrom": "ai_insights",
+          "tableTo": "segments",
+          "columnsFrom": [
+            "segment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.audit_logs": {
       "name": "audit_logs",
       "schema": "",
@@ -172,8 +282,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.batch_errors": {
-      "name": "batch_errors",
+    "public.call_recordings": {
+      "name": "call_recordings",
       "schema": "",
       "columns": {
         "id": {
@@ -181,13 +291,13 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
-        "batch_run_id": {
-          "name": "batch_run_id",
+        "interaction_id": {
+          "name": "interaction_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "tenant_id": {
           "name": "tenant_id",
@@ -195,33 +305,27 @@
           "primaryKey": false,
           "notNull": true
         },
-        "row_index": {
-          "name": "row_index",
-          "type": "integer",
+        "record_id": {
+          "name": "record_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "record_ref": {
-          "name": "record_ref",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_message": {
-          "name": "error_message",
+        "s3_audio_url": {
+          "name": "s3_audio_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "raw_data": {
-          "name": "raw_data",
-          "type": "jsonb",
+        "duration_seconds": {
+          "name": "duration_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transcript_id": {
+          "name": "transcript_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -233,51 +337,14 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "batch_errors_batch_run_id_idx": {
-          "name": "batch_errors_batch_run_id_idx",
-          "columns": [
-            {
-              "expression": "batch_run_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "batch_errors_tenant_batch_run_id_idx": {
-          "name": "batch_errors_tenant_batch_run_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "batch_run_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
-        "batch_errors_batch_run_id_batch_runs_id_fk": {
-          "name": "batch_errors_batch_run_id_batch_runs_id_fk",
-          "tableFrom": "batch_errors",
-          "tableTo": "batch_runs",
+        "call_recordings_interaction_id_interaction_events_id_fk": {
+          "name": "call_recordings_interaction_id_interaction_events_id_fk",
+          "tableFrom": "call_recordings",
+          "tableTo": "interaction_events",
           "columnsFrom": [
-            "batch_run_id"
+            "interaction_id"
           ],
           "columnsTo": [
             "id"
@@ -285,186 +352,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "batch_errors_tenant_id_tenants_id_fk": {
-          "name": "batch_errors_tenant_id_tenants_id_fk",
-          "tableFrom": "batch_errors",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.batch_runs": {
-      "name": "batch_runs",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "job_id": {
-          "name": "job_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "batch_type": {
-          "name": "batch_type",
-          "type": "varchar(30)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_ref": {
-          "name": "source_ref",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "total_records": {
-          "name": "total_records",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "processed": {
-          "name": "processed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "succeeded": {
-          "name": "succeeded",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "failed": {
-          "name": "failed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "skipped": {
-          "name": "skipped",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "batch_runs_tenant_batchtype_status_idx": {
-          "name": "batch_runs_tenant_batchtype_status_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "batch_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "batch_runs_job_id_idx": {
-          "name": "batch_runs_job_id_idx",
-          "columns": [
-            {
-              "expression": "job_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "batch_runs_source_ref_idx": {
-          "name": "batch_runs_source_ref_idx",
-          "columns": [
-            {
-              "expression": "source_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "batch_runs_tenant_id_tenants_id_fk": {
-          "name": "batch_runs_tenant_id_tenants_id_fk",
-          "tableFrom": "batch_runs",
+        "call_recordings_tenant_id_tenants_id_fk": {
+          "name": "call_recordings_tenant_id_tenants_id_fk",
+          "tableFrom": "call_recordings",
           "tableTo": "tenants",
           "columnsFrom": [
             "tenant_id"
@@ -475,12 +365,25 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "batch_runs_job_id_job_queue_id_fk": {
-          "name": "batch_runs_job_id_job_queue_id_fk",
-          "tableFrom": "batch_runs",
-          "tableTo": "job_queue",
+        "call_recordings_record_id_portfolio_records_id_fk": {
+          "name": "call_recordings_record_id_portfolio_records_id_fk",
+          "tableFrom": "call_recordings",
+          "tableTo": "portfolio_records",
           "columnsFrom": [
-            "job_id"
+            "record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "call_recordings_transcript_id_conversation_transcripts_id_fk": {
+          "name": "call_recordings_transcript_id_conversation_transcripts_id_fk",
+          "tableFrom": "call_recordings",
+          "tableTo": "conversation_transcripts",
+          "columnsFrom": [
+            "transcript_id"
           ],
           "columnsTo": [
             "id"
@@ -538,6 +441,13 @@
           "notNull": false,
           "default": "'{}'::jsonb"
         },
+        "dispatch_api_template": {
+          "name": "dispatch_api_template",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
         "daily_cap": {
           "name": "daily_cap",
           "type": "integer",
@@ -549,6 +459,25 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "callback_url": {
+          "name": "callback_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "callback_secret": {
+          "name": "callback_secret",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "callback_payload_map": {
+          "name": "callback_payload_map",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
         "updated_by": {
           "name": "updated_by",
@@ -630,7 +559,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
@@ -644,20 +573,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "rule_id": {
-          "name": "rule_id",
+        "journey_step_id": {
+          "name": "journey_step_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "template_id": {
-          "name": "template_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "job_id": {
-          "name": "job_id",
+        "segment_id": {
+          "name": "segment_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -672,7 +595,7 @@
           "name": "status",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "'scheduled'"
         },
         "resolved_body": {
@@ -690,12 +613,6 @@
         },
         "scheduled_at": {
           "name": "scheduled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "queued_at": {
-          "name": "queued_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -751,8 +668,8 @@
           "method": "btree",
           "with": {}
         },
-        "comm_events_tenant_status_idx": {
-          "name": "comm_events_tenant_status_idx",
+        "comm_events_tenant_status_scheduled_idx": {
+          "name": "comm_events_tenant_status_scheduled_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -762,21 +679,6 @@
             },
             {
               "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "comm_events_tenant_scheduled_at_idx": {
-          "name": "comm_events_tenant_scheduled_at_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -793,11 +695,26 @@
           "method": "btree",
           "with": {}
         },
-        "comm_events_job_id_idx": {
-          "name": "comm_events_job_id_idx",
+        "comm_events_idempotency_key_idx": {
+          "name": "comm_events_idempotency_key_idx",
           "columns": [
             {
-              "expression": "job_id",
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "comm_events_journey_step_id_idx": {
+          "name": "comm_events_journey_step_id_idx",
+          "columns": [
+            {
+              "expression": "journey_step_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -836,12 +753,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "comm_events_rule_id_workflow_rules_id_fk": {
-          "name": "comm_events_rule_id_workflow_rules_id_fk",
+        "comm_events_journey_step_id_journey_steps_id_fk": {
+          "name": "comm_events_journey_step_id_journey_steps_id_fk",
           "tableFrom": "comm_events",
-          "tableTo": "workflow_rules",
+          "tableTo": "journey_steps",
           "columnsFrom": [
-            "rule_id"
+            "journey_step_id"
           ],
           "columnsTo": [
             "id"
@@ -849,25 +766,12 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "comm_events_template_id_comm_templates_id_fk": {
-          "name": "comm_events_template_id_comm_templates_id_fk",
+        "comm_events_segment_id_segments_id_fk": {
+          "name": "comm_events_segment_id_segments_id_fk",
           "tableFrom": "comm_events",
-          "tableTo": "comm_templates",
+          "tableTo": "segments",
           "columnsFrom": [
-            "template_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "comm_events_job_id_job_queue_id_fk": {
-          "name": "comm_events_job_id_job_queue_id_fk",
-          "tableFrom": "comm_events",
-          "tableTo": "job_queue",
-          "columnsFrom": [
-            "job_id"
+            "segment_id"
           ],
           "columnsTo": [
             "id"
@@ -899,7 +803,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
@@ -919,17 +823,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "dpd_bucket": {
-          "name": "dpd_bucket",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "language": {
           "name": "language",
           "type": "varchar(10)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "'en'"
         },
         "body": {
@@ -945,18 +843,24 @@
           "notNull": false,
           "default": "'[]'::jsonb"
         },
+        "provider_template_id": {
+          "name": "provider_template_id",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_variables": {
+          "name": "provider_variables",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
         "media_url": {
           "name": "media_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
         },
         "is_active": {
           "name": "is_active",
@@ -964,12 +868,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": true
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_by": {
           "name": "created_by",
@@ -993,23 +891,8 @@
         }
       },
       "indexes": {
-        "comm_templates_tenant_id_idx": {
-          "name": "comm_templates_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "comm_templates_tenant_channel_bucket_idx": {
-          "name": "comm_templates_tenant_channel_bucket_idx",
+        "comm_templates_tenant_channel_idx": {
+          "name": "comm_templates_tenant_channel_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -1019,12 +902,6 @@
             },
             {
               "expression": "channel",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "dpd_bucket",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1056,6 +933,109 @@
           "tableTo": "tenant_users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conversation_transcripts": {
+      "name": "conversation_transcripts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "interaction_id": {
+          "name": "interaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "record_id": {
+          "name": "record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transcript_text": {
+          "name": "transcript_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "numeric(4, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_json": {
+          "name": "raw_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "conversation_transcripts_interaction_id_interaction_events_id_fk": {
+          "name": "conversation_transcripts_interaction_id_interaction_events_id_fk",
+          "tableFrom": "conversation_transcripts",
+          "tableTo": "interaction_events",
+          "columnsFrom": [
+            "interaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conversation_transcripts_tenant_id_tenants_id_fk": {
+          "name": "conversation_transcripts_tenant_id_tenants_id_fk",
+          "tableFrom": "conversation_transcripts",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conversation_transcripts_record_id_portfolio_records_id_fk": {
+          "name": "conversation_transcripts_record_id_portfolio_records_id_fk",
+          "tableFrom": "conversation_transcripts",
+          "tableTo": "portfolio_records",
+          "columnsFrom": [
+            "record_id"
           ],
           "columnsTo": [
             "id"
@@ -1123,6 +1103,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "failure_reason": {
+          "name": "failure_reason",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "delivered_at": {
           "name": "delivered_at",
           "type": "timestamp with time zone",
@@ -1131,6 +1117,31 @@
         },
         "read_at": {
           "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replied_at": {
+          "name": "replied_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reply_content": {
+          "name": "reply_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_clicked": {
+          "name": "link_clicked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "link_clicked_at": {
+          "name": "link_clicked_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -1379,8 +1390,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.job_queue": {
-      "name": "job_queue",
+    "public.interaction_events": {
+      "name": "interaction_events",
       "schema": "",
       "columns": {
         "id": {
@@ -1388,106 +1399,231 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
           "type": "uuid",
           "primaryKey": false,
+          "notNull": true
+        },
+        "record_id": {
+          "name": "record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comm_event_id": {
+          "name": "comm_event_id",
+          "type": "uuid",
+          "primaryKey": false,
           "notNull": false
         },
-        "job_type": {
-          "name": "job_type",
+        "journey_step_id": {
+          "name": "journey_step_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interaction_type": {
+          "name": "interaction_type",
           "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
+        "channel": {
+          "name": "channel",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
+          "notNull": false
         },
-        "payload": {
-          "name": "payload",
+        "details": {
+          "name": "details",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "interaction_events_tenant_type_record_idx": {
+          "name": "interaction_events_tenant_type_record_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "interaction_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "comm_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "interaction_events_tenant_id_tenants_id_fk": {
+          "name": "interaction_events_tenant_id_tenants_id_fk",
+          "tableFrom": "interaction_events",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "interaction_events_record_id_portfolio_records_id_fk": {
+          "name": "interaction_events_record_id_portfolio_records_id_fk",
+          "tableFrom": "interaction_events",
+          "tableTo": "portfolio_records",
+          "columnsFrom": [
+            "record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "interaction_events_comm_event_id_comm_events_id_fk": {
+          "name": "interaction_events_comm_event_id_comm_events_id_fk",
+          "tableFrom": "interaction_events",
+          "tableTo": "comm_events",
+          "columnsFrom": [
+            "comm_event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "interaction_events_journey_step_id_journey_steps_id_fk": {
+          "name": "interaction_events_journey_step_id_journey_steps_id_fk",
+          "tableFrom": "interaction_events",
+          "tableTo": "journey_steps",
+          "columnsFrom": [
+            "journey_step_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.journey_steps": {
+      "name": "journey_steps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "journey_id": {
+          "name": "journey_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "priority": {
-          "name": "priority",
+        "step_order": {
+          "name": "step_order",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "default": 5
+          "notNull": true
         },
-        "attempts": {
-          "name": "attempts",
+        "action_type": {
+          "name": "action_type",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel": {
+          "name": "channel",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delay_hours": {
+          "name": "delay_hours",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "default": 0
         },
-        "max_attempts": {
-          "name": "max_attempts",
+        "repeat_interval_days": {
+          "name": "repeat_interval_days",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "default": 3
+          "notNull": false
         },
-        "claimed_by": {
-          "name": "claimed_by",
-          "type": "varchar(100)",
+        "schedule_cron": {
+          "name": "schedule_cron",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
-        "claimed_at": {
-          "name": "claimed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_expires_at": {
-          "name": "claim_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "run_after": {
-          "name": "run_after",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "result": {
-          "name": "result",
+        "conditions_jsonb": {
+          "name": "conditions_jsonb",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
+        "provider_override": {
+          "name": "provider_override",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'{}'::jsonb"
         },
-        "failed_at": {
-          "name": "failed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_retry_at": {
-          "name": "next_retry_at",
-          "type": "timestamp with time zone",
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1507,65 +1643,17 @@
         }
       },
       "indexes": {
-        "job_queue_status_runafter_priority_idx": {
-          "name": "job_queue_status_runafter_priority_idx",
+        "journey_steps_journey_step_order_idx": {
+          "name": "journey_steps_journey_step_order_idx",
           "columns": [
             {
-              "expression": "status",
+              "expression": "journey_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "run_after",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "priority",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "job_queue_tenant_jobtype_status_idx": {
-          "name": "job_queue_tenant_jobtype_status_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "job_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "job_queue_claim_expires_at_idx": {
-          "name": "job_queue_claim_expires_at_idx",
-          "columns": [
-            {
-              "expression": "claim_expires_at",
+              "expression": "step_order",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1578,12 +1666,178 @@
         }
       },
       "foreignKeys": {
-        "job_queue_tenant_id_tenants_id_fk": {
-          "name": "job_queue_tenant_id_tenants_id_fk",
-          "tableFrom": "job_queue",
+        "journey_steps_journey_id_journeys_id_fk": {
+          "name": "journey_steps_journey_id_journeys_id_fk",
+          "tableFrom": "journey_steps",
+          "tableTo": "journeys",
+          "columnsFrom": [
+            "journey_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "journey_steps_template_id_comm_templates_id_fk": {
+          "name": "journey_steps_template_id_comm_templates_id_fk",
+          "tableFrom": "journey_steps",
+          "tableTo": "comm_templates",
+          "columnsFrom": [
+            "template_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "journey_steps_created_by_tenant_users_id_fk": {
+          "name": "journey_steps_created_by_tenant_users_id_fk",
+          "tableFrom": "journey_steps",
+          "tableTo": "tenant_users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.journeys": {
+      "name": "journeys",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "success_metric": {
+          "name": "success_metric",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'ptp_rate'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "journeys_tenant_segment_idx": {
+          "name": "journeys_tenant_segment_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "segment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "journeys_tenant_id_tenants_id_fk": {
+          "name": "journeys_tenant_id_tenants_id_fk",
+          "tableFrom": "journeys",
           "tableTo": "tenants",
           "columnsFrom": [
             "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "journeys_segment_id_segments_id_fk": {
+          "name": "journeys_segment_id_segments_id_fk",
+          "tableFrom": "journeys",
+          "tableTo": "segments",
+          "columnsFrom": [
+            "segment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "journeys_created_by_tenant_users_id_fk": {
+          "name": "journeys_created_by_tenant_users_id_fk",
+          "tableFrom": "journeys",
+          "tableTo": "tenant_users",
+          "columnsFrom": [
+            "created_by"
           ],
           "columnsTo": [
             "id"
@@ -1780,6 +2034,351 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.portfolio_configs": {
+      "name": "portfolio_configs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lender_name": {
+          "name": "lender_name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_book_size": {
+          "name": "total_book_size",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secured_unsecured_split": {
+          "name": "secured_unsecured_split",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_products": {
+          "name": "primary_products",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "monthly_inflow": {
+          "name": "monthly_inflow",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_dpd_stock": {
+          "name": "current_dpd_stock",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_efficiency": {
+          "name": "current_efficiency",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_efficiency": {
+          "name": "target_efficiency",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_ror": {
+          "name": "target_ror",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_contactability": {
+          "name": "current_contactability",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_channels": {
+          "name": "approved_channels",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "allocation_start_date": {
+          "name": "allocation_start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allocation_end_date": {
+          "name": "allocation_end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_file_frequency": {
+          "name": "paid_file_frequency",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "waiver_grid": {
+          "name": "waiver_grid",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "current_acr": {
+          "name": "current_acr",
+          "type": "numeric(8, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commercials_model": {
+          "name": "commercials_model",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reporting_frequency": {
+          "name": "reporting_frequency",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expected_region_split": {
+          "name": "expected_region_split",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "stakeholder_goals": {
+          "name": "stakeholder_goals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "portfolio_configs_tenant_id_idx": {
+          "name": "portfolio_configs_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "portfolio_configs_tenant_id_tenants_id_fk": {
+          "name": "portfolio_configs_tenant_id_tenants_id_fk",
+          "tableFrom": "portfolio_configs",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_configs_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_configs_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_configs",
+          "tableTo": "portfolios",
+          "columnsFrom": [
+            "portfolio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.portfolio_mapping_profiles": {
+      "name": "portfolio_mapping_profiles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mappings": {
+          "name": "mappings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "headers": {
+          "name": "headers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "field_count": {
+          "name": "field_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "portfolio_mapping_profiles_tenant_id_idx": {
+          "name": "portfolio_mapping_profiles_tenant_id_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_mapping_profiles_tenant_name_idx": {
+          "name": "portfolio_mapping_profiles_tenant_name_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "portfolio_mapping_profiles_tenant_id_tenants_id_fk": {
+          "name": "portfolio_mapping_profiles_tenant_id_tenants_id_fk",
+          "tableFrom": "portfolio_mapping_profiles",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.portfolio_records": {
       "name": "portfolio_records",
       "schema": "",
@@ -1789,7 +2388,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "portfolio_id": {
           "name": "portfolio_id",
@@ -1805,7 +2404,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "varchar(50)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1827,31 +2426,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "employer_id": {
-          "name": "employer_id",
-          "type": "varchar(50)",
+        "employer_name": {
+          "name": "employer_name",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
-        },
-        "current_dpd": {
-          "name": "current_dpd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "dpd_bucket": {
-          "name": "dpd_bucket",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "overdue": {
-          "name": "overdue",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0'"
         },
         "outstanding": {
           "name": "outstanding",
@@ -1860,8 +2439,202 @@
           "notNull": false,
           "default": "'0'"
         },
+        "current_dpd": {
+          "name": "current_dpd",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "loan_number": {
+          "name": "loan_number",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emi_amount": {
+          "name": "emi_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cibil_score": {
+          "name": "cibil_score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "salary_date": {
+          "name": "salary_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enach_enabled": {
+          "name": "enach_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "alternate_numbers": {
+          "name": "alternate_numbers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "loan_amount": {
+          "name": "loan_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "dynamic_fields": {
           "name": "dynamic_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "segment_id": {
+          "name": "segment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_segmented_at": {
+          "name": "last_segmented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_contacted_at": {
+          "name": "last_contacted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_contacted_channel": {
+          "name": "last_contacted_channel",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_delivery_status": {
+          "name": "last_delivery_status",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_interaction_type": {
+          "name": "last_interaction_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_interaction_at": {
+          "name": "last_interaction_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ptp_date": {
+          "name": "ptp_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ptp_amount": {
+          "name": "ptp_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ptp_status": {
+          "name": "ptp_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contactability_score": {
+          "name": "contactability_score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "preferred_channel": {
+          "name": "preferred_channel",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_comm_attempts": {
+          "name": "total_comm_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "total_comm_delivered": {
+          "name": "total_comm_delivered",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "total_comm_read": {
+          "name": "total_comm_read",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "total_comm_replied": {
+          "name": "total_comm_replied",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "risk_bucket": {
+          "name": "risk_bucket",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "feedback_summary": {
+          "name": "feedback_summary",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false,
@@ -1874,11 +2647,18 @@
           "notNull": false,
           "default": false
         },
-        "last_synced_at": {
-          "name": "last_synced_at",
+        "last_repayment_at": {
+          "name": "last_repayment_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "total_repaid": {
+          "name": "total_repaid",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
         },
         "created_at": {
           "name": "created_at",
@@ -1893,6 +2673,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1911,8 +2697,8 @@
           "method": "btree",
           "with": {}
         },
-        "portfolio_records_tenant_user_idx": {
-          "name": "portfolio_records_tenant_user_idx",
+        "portfolio_records_tenant_user_id_idx": {
+          "name": "portfolio_records_tenant_user_id_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -1922,6 +2708,48 @@
             },
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_mobile_idx": {
+          "name": "portfolio_records_tenant_mobile_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mobile",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_segment_idx": {
+          "name": "portfolio_records_tenant_segment_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "segment_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1953,8 +2781,8 @@
           "method": "btree",
           "with": {}
         },
-        "portfolio_records_tenant_bucket_idx": {
-          "name": "portfolio_records_tenant_bucket_idx",
+        "portfolio_records_tenant_outstanding_idx": {
+          "name": "portfolio_records_tenant_outstanding_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -1963,22 +2791,7 @@
               "nulls": "last"
             },
             {
-              "expression": "dpd_bucket",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "portfolio_records_mobile_idx": {
-          "name": "portfolio_records_mobile_idx",
-          "columns": [
-            {
-              "expression": "mobile",
+              "expression": "outstanding",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2018,6 +2831,132 @@
           "concurrently": false,
           "method": "gin",
           "with": {}
+        },
+        "portfolio_records_tenant_state_idx": {
+          "name": "portfolio_records_tenant_state_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_cibil_idx": {
+          "name": "portfolio_records_tenant_cibil_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cibil_score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_due_date_idx": {
+          "name": "portfolio_records_tenant_due_date_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "due_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_loan_number_idx": {
+          "name": "portfolio_records_tenant_loan_number_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "loan_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_email_idx": {
+          "name": "portfolio_records_tenant_email_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "portfolio_records_tenant_contactability_idx": {
+          "name": "portfolio_records_tenant_contactability_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contactability_score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2046,6 +2985,19 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "portfolio_records_segment_id_segments_id_fk": {
+          "name": "portfolio_records_segment_id_segments_id_fk",
+          "tableFrom": "portfolio_records",
+          "tableTo": "segments",
+          "columnsFrom": [
+            "segment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2063,13 +3015,19 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "mapping_profile_id": {
+          "name": "mapping_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "allocation_month": {
           "name": "allocation_month",
@@ -2087,7 +3045,7 @@
           "name": "status",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "'pending'"
         },
         "file_url": {
@@ -2143,26 +3101,17 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
-        "portfolios_tenant_id_idx": {
-          "name": "portfolios_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "portfolios_tenant_alloc_month_idx": {
-          "name": "portfolios_tenant_alloc_month_idx",
+        "portfolios_tenant_month_status_idx": {
+          "name": "portfolios_tenant_month_status_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -2175,16 +3124,7 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "portfolios_status_idx": {
-          "name": "portfolios_status_idx",
-          "columns": [
+            },
             {
               "expression": "status",
               "isExpression": false,
@@ -2212,12 +3152,168 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "portfolios_mapping_profile_id_portfolio_mapping_profiles_id_fk": {
+          "name": "portfolios_mapping_profile_id_portfolio_mapping_profiles_id_fk",
+          "tableFrom": "portfolios",
+          "tableTo": "portfolio_mapping_profiles",
+          "columnsFrom": [
+            "mapping_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "portfolios_uploaded_by_tenant_users_id_fk": {
           "name": "portfolios_uploaded_by_tenant_users_id_fk",
           "tableFrom": "portfolios",
           "tableTo": "tenant_users",
           "columnsFrom": [
             "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.repayment_records": {
+      "name": "repayment_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "portfolio_record_id": {
+          "name": "portfolio_record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repayment_sync_id": {
+          "name": "repayment_sync_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_date": {
+          "name": "payment_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_type": {
+          "name": "payment_type",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_raw": {
+          "name": "source_raw",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "repayment_records_tenant_date_record_idx": {
+          "name": "repayment_records_tenant_date_record_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "payment_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "portfolio_record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "repayment_records_tenant_id_tenants_id_fk": {
+          "name": "repayment_records_tenant_id_tenants_id_fk",
+          "tableFrom": "repayment_records",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "repayment_records_portfolio_record_id_portfolio_records_id_fk": {
+          "name": "repayment_records_portfolio_record_id_portfolio_records_id_fk",
+          "tableFrom": "repayment_records",
+          "tableTo": "portfolio_records",
+          "columnsFrom": [
+            "portfolio_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "repayment_records_repayment_sync_id_repayment_syncs_id_fk": {
+          "name": "repayment_records_repayment_sync_id_repayment_syncs_id_fk",
+          "tableFrom": "repayment_records",
+          "tableTo": "repayment_syncs",
+          "columnsFrom": [
+            "repayment_sync_id"
           ],
           "columnsTo": [
             "id"
@@ -2494,10 +3590,10 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "report_jobs_job_id_job_queue_id_fk": {
-          "name": "report_jobs_job_id_job_queue_id_fk",
+        "report_jobs_job_id_task_queue_id_fk": {
+          "name": "report_jobs_job_id_task_queue_id_fk",
           "tableFrom": "report_jobs",
-          "tableTo": "job_queue",
+          "tableTo": "task_queue",
           "columnsFrom": [
             "job_id"
           ],
@@ -2527,8 +3623,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.scheduled_jobs": {
-      "name": "scheduled_jobs",
+    "public.segmentation_runs": {
+      "name": "segmentation_runs",
       "schema": "",
       "columns": {
         "id": {
@@ -2536,32 +3632,171 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
           "type": "uuid",
           "primaryKey": false,
+          "notNull": true
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "uuid",
+          "primaryKey": false,
           "notNull": false
         },
-        "job_type": {
-          "name": "job_type",
-          "type": "varchar(50)",
+        "triggered_by": {
+          "name": "triggered_by",
+          "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "cron_expression": {
-          "name": "cron_expression",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payload_template": {
-          "name": "payload_template",
-          "type": "jsonb",
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false,
-          "default": "'{}'::jsonb"
+          "default": "'pending'"
+        },
+        "total_records": {
+          "name": "total_records",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "processed": {
+          "name": "processed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "segmentation_runs_tenant_portfolio_idx": {
+          "name": "segmentation_runs_tenant_portfolio_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "portfolio_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "segmentation_runs_tenant_id_tenants_id_fk": {
+          "name": "segmentation_runs_tenant_id_tenants_id_fk",
+          "tableFrom": "segmentation_runs",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "segmentation_runs_portfolio_id_portfolios_id_fk": {
+          "name": "segmentation_runs_portfolio_id_portfolios_id_fk",
+          "tableFrom": "segmentation_runs",
+          "tableTo": "portfolios",
+          "columnsFrom": [
+            "portfolio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "segmentation_runs_triggered_by_tenant_users_id_fk": {
+          "name": "segmentation_runs_triggered_by_tenant_users_id_fk",
+          "tableFrom": "segmentation_runs",
+          "tableTo": "tenant_users",
+          "columnsFrom": [
+            "triggered_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.segments": {
+      "name": "segments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "is_active": {
           "name": "is_active",
@@ -2570,29 +3805,25 @@
           "notNull": false,
           "default": true
         },
-        "last_run_at": {
-          "name": "last_run_at",
-          "type": "timestamp with time zone",
+        "priority": {
+          "name": "priority",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": 100
         },
-        "last_run_status": {
-          "name": "last_run_status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_job_id": {
-          "name": "last_job_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_run_at": {
-          "name": "next_run_at",
-          "type": "timestamp with time zone",
+        "criteria_jsonb": {
+          "name": "criteria_jsonb",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "success_rate": {
+          "name": "success_rate",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
         },
         "created_by": {
           "name": "created_by",
@@ -2616,29 +3847,8 @@
         }
       },
       "indexes": {
-        "scheduled_jobs_isactive_nextrunat_idx": {
-          "name": "scheduled_jobs_isactive_nextrunat_idx",
-          "columns": [
-            {
-              "expression": "is_active",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_run_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "scheduled_jobs_tenant_id_idx": {
-          "name": "scheduled_jobs_tenant_id_idx",
+        "segments_tenant_id_idx": {
+          "name": "segments_tenant_id_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -2651,12 +3861,60 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "segments_tenant_active_priority_idx": {
+          "name": "segments_tenant_active_priority_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "priority",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "segments_tenant_default_idx": {
+          "name": "segments_tenant_default_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "is_default",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "scheduled_jobs_tenant_id_tenants_id_fk": {
-          "name": "scheduled_jobs_tenant_id_tenants_id_fk",
-          "tableFrom": "scheduled_jobs",
+        "segments_tenant_id_tenants_id_fk": {
+          "name": "segments_tenant_id_tenants_id_fk",
+          "tableFrom": "segments",
           "tableTo": "tenants",
           "columnsFrom": [
             "tenant_id"
@@ -2667,25 +3925,142 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "scheduled_jobs_last_job_id_job_queue_id_fk": {
-          "name": "scheduled_jobs_last_job_id_job_queue_id_fk",
-          "tableFrom": "scheduled_jobs",
-          "tableTo": "job_queue",
+        "segments_created_by_tenant_users_id_fk": {
+          "name": "segments_created_by_tenant_users_id_fk",
+          "tableFrom": "segments",
+          "tableTo": "tenant_users",
           "columnsFrom": [
-            "last_job_id"
+            "created_by"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_queue": {
+      "name": "task_queue",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_ulid()"
         },
-        "scheduled_jobs_created_by_tenant_users_id_fk": {
-          "name": "scheduled_jobs_created_by_tenant_users_id_fk",
-          "tableFrom": "scheduled_jobs",
-          "tableTo": "tenant_users",
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_type": {
+          "name": "task_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kafka_topic": {
+          "name": "kafka_topic",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kafka_key": {
+          "name": "kafka_key",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 5
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "run_after": {
+          "name": "run_after",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "task_queue_tenant_id_tenants_id_fk": {
+          "name": "task_queue_tenant_id_tenants_id_fk",
+          "tableFrom": "task_queue",
+          "tableTo": "tenants",
           "columnsFrom": [
-            "created_by"
+            "tenant_id"
           ],
           "columnsTo": [
             "id"
@@ -2709,7 +4084,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "tenant_id": {
           "name": "tenant_id",
@@ -2745,7 +4120,7 @@
           "name": "data_type",
           "type": "varchar(20)",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "'string'"
         },
         "is_core": {
@@ -2761,6 +4136,19 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "is_strategic": {
+          "name": "is_strategic",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "semantic_role": {
+          "name": "semantic_role",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
         },
         "sample_value": {
           "name": "sample_value",
@@ -3019,7 +4407,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "gen_ulid()"
         },
         "name": {
           "name": "name",
@@ -3066,6 +4454,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3096,214 +4490,6 @@
           ]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.workflow_rules": {
-      "name": "workflow_rules",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bucket_id": {
-          "name": "bucket_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "template_id": {
-          "name": "template_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "channel": {
-          "name": "channel",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "priority": {
-          "name": "priority",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "delay_days": {
-          "name": "delay_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "repeat_interval_days": {
-          "name": "repeat_interval_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "schedule_cron": {
-          "name": "schedule_cron",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "workflow_rules_tenant_id_idx": {
-          "name": "workflow_rules_tenant_id_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "workflow_rules_tenant_bucket_idx": {
-          "name": "workflow_rules_tenant_bucket_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "bucket_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "workflow_rules_tenant_channel_idx": {
-          "name": "workflow_rules_tenant_channel_idx",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "channel",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "workflow_rules_tenant_id_tenants_id_fk": {
-          "name": "workflow_rules_tenant_id_tenants_id_fk",
-          "tableFrom": "workflow_rules",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "workflow_rules_bucket_id_dpd_bucket_configs_id_fk": {
-          "name": "workflow_rules_bucket_id_dpd_bucket_configs_id_fk",
-          "tableFrom": "workflow_rules",
-          "tableTo": "dpd_bucket_configs",
-          "columnsFrom": [
-            "bucket_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "workflow_rules_template_id_comm_templates_id_fk": {
-          "name": "workflow_rules_template_id_comm_templates_id_fk",
-          "tableFrom": "workflow_rules",
-          "tableTo": "comm_templates",
-          "columnsFrom": [
-            "template_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "workflow_rules_created_by_tenant_users_id_fk": {
-          "name": "workflow_rules_created_by_tenant_users_id_fk",
-          "tableFrom": "workflow_rules",
-          "tableTo": "tenant_users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

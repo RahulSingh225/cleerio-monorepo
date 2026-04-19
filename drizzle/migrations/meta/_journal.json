@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774965693948,
-      "tag": "0000_graceful_clint_barton",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775819979831,
-      "tag": "0001_thankful_doctor_octopus",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775893826780,
-      "tag": "0002_easy_shaman",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776155946125,
-      "tag": "0003_overjoyed_eternals",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1776361773140,
-      "tag": "0004_tranquil_ink",
+      "when": 1776591008906,
+      "tag": "0000_unique_frog_thor",
       "breakpoints": true
     }
   ]
