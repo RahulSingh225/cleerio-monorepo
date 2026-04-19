@@ -34,9 +34,14 @@ export class GenericDispatcherService {
       product: record.product,
       currentDpd: record.currentDpd,
       outstanding: record.outstanding,
-      overdue: record.outstanding,
+      overdue: record.outstanding, // fallback
       employerName: record.employerName,
       
+      // Snake_case aliases for core
+      user_id: record.userId,
+      current_dpd: record.currentDpd,
+      employer_name: record.employerName,
+
       // Promoted core fields (from stakeholder data requirements)
       loanNumber: record.loanNumber,
       email: record.email,
@@ -50,11 +55,23 @@ export class GenericDispatcherService {
       enachEnabled: record.enachEnabled,
       loanAmount: record.loanAmount,
       
-      // Provider specifics
-      TEMPLATE_ID: template.providerTemplateId,
-      
+      // Snake_case aliases for promoted core
+      loan_number: record.loanNumber,
+      due_date: record.dueDate,
+      emi_amount: record.emiAmount,
+      cibil_score: record.cibilScore,
+      salary_date: record.salaryDate,
+      enach_enabled: record.enachEnabled,
+      loan_amount: record.loanAmount,
+
       // Dynamic fields from portfolio_records.dynamic_fields
       ...(record.dynamicFields as Record<string, any> || {}),
+
+      // Provider specifics (Precedence: Template > Record)
+      TEMPLATE_ID: template?.providerTemplateId,
+      templateId: template?.providerTemplateId,
+      template_id: template?.providerTemplateId,
+      providerTemplateId: template?.providerTemplateId,
     };
 
     // 2. Resolve providerVariables from template if present
