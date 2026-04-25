@@ -26,13 +26,19 @@ import {
   CheckCircle2,
   Send,
   Globe,
+  IndianRupee,
+  Ban,
+  XCircle,
+  Eye,
+  MousePointerClick,
 } from 'lucide-react';
 
 export default function CaseDetailsPage() {
   const params = useParams();
   const recordId = params.id as string;
   const [record, setRecord] = useState<any>(null);
-  const [interactions, setInteractions] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timelineFilter, setTimelineFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,10 +51,10 @@ export default function CaseDetailsPage() {
       setRecord(res.data.data);
 
       try {
-        const eventsRes = await api.get(`/interactions/record/${recordId}`);
-        setInteractions(eventsRes.data.data || []);
+        const timelineRes = await api.get(`/portfolio-records/${recordId}/timeline`);
+        setTimeline(timelineRes.data.data || []);
       } catch (e) {
-        console.warn('Could not load interactions', e);
+        console.warn('Could not load timeline', e);
       }
     } catch (err) {
       console.error('Failed to load record', err);
@@ -176,6 +182,48 @@ export default function CaseDetailsPage() {
                   <StatusBadge label={record.enachEnabled ? 'Active' : 'Inactive'} variant={record.enachEnabled ? 'success' : 'warning'} />
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Repayment Summary */}
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <IndianRupee className="w-4 h-4 text-emerald-600" />
+              Repayment Summary
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">Total Repaid</span>
+                <span className="text-lg font-bold text-emerald-600">₹{Number(record.totalRepaid || 0).toLocaleString()}</span>
+              </div>
+              {record.loanAmount && Number(record.loanAmount) > 0 && (
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-[var(--text-secondary)]">Recovery Progress</span>
+                    <span className="font-bold text-[var(--text-primary)]">
+                      {Math.min(100, Math.round((Number(record.totalRepaid || 0) / Number(record.loanAmount)) * 100))}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-1000"
+                      style={{ width: `${Math.min(100, (Number(record.totalRepaid || 0) / Number(record.loanAmount)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {record.lastRepaymentAt && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--text-secondary)]">Last Payment</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    {new Date(record.lastRepaymentAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">Payments in Timeline</span>
+                <span className="text-sm font-bold text-[var(--text-primary)]">{timeline.filter(e => e.type === 'repayment').length}</span>
+              </div>
             </div>
           </div>
 
@@ -407,65 +455,175 @@ export default function CaseDetailsPage() {
             )}
           </div>
 
-          {/* Communication Timeline */}
-          <div className="card mt-4 p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[var(--primary)]" />
-              Interaction Timeline
-            </h3>
-            
-            {interactions.length > 0 ? (
-              <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-300 before:to-transparent">
-                {interactions.map((interaction, ix) => (
-                  <div key={interaction.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    {/* Icon indicator */}
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                      {interaction.type === 'ptp' ? <ThumbsUp className="w-4 h-4 text-emerald-500" /> : 
-                       interaction.type === 'reply' ? <MessageSquare className="w-4 h-4 text-blue-500" /> :
-                       interaction.type === 'delivery_status' ? <CheckCircle2 className="w-4 h-4 text-gray-400" /> :
-                       interaction.type === 'invalid_contact' ? <ThumbsDown className="w-4 h-4 text-red-500" /> :
-                       <Activity className="w-4 h-4 text-indigo-500" />}
-                    </div>
-                    {/* Event Content */}
-                    <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] card p-4 hover:shadow-md transition">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase text-[var(--text-secondary)]">{interaction.type.replace('_', ' ')}</span>
-                          <span className="text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-500 rounded-lg uppercase">{interaction.channel}</span>
-                        </div>
-                        <time className="text-[10px] text-[var(--text-tertiary)]">{new Date(interaction.createdAt).toLocaleString()}</time>
+          {/* 360° Unified Timeline */}
+          <div className="card mt-4">
+            <div className="p-5 border-b border-[var(--border)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[var(--primary)]" />
+                360° Activity Timeline
+              </h3>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">Communications, interactions, and repayments in chronological order.</p>
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-1.5 mt-3">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'communication', label: 'Comms' },
+                  { key: 'repayment', label: 'Payments' },
+                  { key: 'interaction', label: 'Interactions' },
+                ].map((tab) => {
+                  const count = tab.key === 'all' ? timeline.length : timeline.filter(e => e.type === tab.key).length;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setTimelineFilter(tab.key)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        timelineFilter === tab.key
+                          ? 'bg-[var(--primary)] text-white'
+                          : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
+                      }`}
+                    >
+                      {tab.label} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="p-5">
+              {(() => {
+                const filtered = timelineFilter === 'all' ? timeline : timeline.filter(e => e.type === timelineFilter);
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-10">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Activity className="w-5 h-5 text-gray-400" />
                       </div>
-                      
-                      {interaction.details?.deliveryStatus && (
-                        <p className="text-sm text-[var(--text-primary)] mt-1">
-                          Status: <span className="font-semibold">{interaction.details.deliveryStatus}</span>
-                        </p>
-                      )}
-                      
-                      {interaction.details?.failureReason && (
-                        <p className="text-xs text-red-600 bg-red-50 p-2 rounded mt-2">
-                          {interaction.details.failureReason}
-                        </p>
-                      )}
-                      
-                      {interaction.details?.replyContent && (
-                        <div className="text-sm text-[var(--text-secondary)] bg-gray-50 p-2.5 rounded-lg mt-2 border border-[var(--border)] relative">
-                          "{interaction.details.replyContent}"
-                        </div>
-                      )}
+                      <p className="text-sm text-[var(--text-secondary)]">No activity recorded yet.</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">Events will appear here as communications are sent and payments are synced.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="relative">
+                    {/* Vertical line */}
+                    <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-[var(--primary)] via-gray-200 to-transparent" />
+                    <div className="space-y-0">
+                      {filtered.map((event: any) => {
+                        const iconConfig = event.type === 'communication'
+                          ? { icon: event.channel === 'sms' ? <MessageSquare className="w-3.5 h-3.5" /> : event.channel === 'whatsapp' ? <MessageSquare className="w-3.5 h-3.5" /> : event.channel === 'ivr' || event.channel === 'voice_bot' ? <PhoneCall className="w-3.5 h-3.5" /> : event.channel === 'email' ? <Mail className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />, bg: 'bg-blue-100 text-blue-600' }
+                          : event.type === 'repayment'
+                          ? { icon: <IndianRupee className="w-3.5 h-3.5" />, bg: 'bg-emerald-100 text-emerald-600' }
+                          : event.category === 'ptp'
+                          ? { icon: <ThumbsUp className="w-3.5 h-3.5" />, bg: 'bg-amber-100 text-amber-600' }
+                          : event.category === 'opt_out'
+                          ? { icon: <Ban className="w-3.5 h-3.5" />, bg: 'bg-red-100 text-red-600' }
+                          : event.category === 'dispute'
+                          ? { icon: <AlertCircle className="w-3.5 h-3.5" />, bg: 'bg-orange-100 text-orange-600' }
+                          : { icon: <Activity className="w-3.5 h-3.5" />, bg: 'bg-violet-100 text-violet-600' };
+
+                        const statusVariant = (s: string | null) => {
+                          if (!s) return 'neutral';
+                          if (['delivered', 'completed', 'read', 'sent'].includes(s)) return 'success';
+                          if (['failed', 'error', 'undelivered'].includes(s)) return 'critical';
+                          if (['scheduled', 'pending', 'processing'].includes(s)) return 'warning';
+                          return 'info';
+                        };
+
+                        return (
+                          <div key={event.id} className="relative flex gap-4 pb-6 last:pb-0 group">
+                            {/* Timeline dot */}
+                            <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full shrink-0 ${iconConfig.bg} shadow-sm ring-4 ring-white`}>
+                              {iconConfig.icon}
+                            </div>
+                            {/* Event card */}
+                            <div className="flex-1 card p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold uppercase text-[var(--text-primary)]">
+                                    {event.type === 'communication' ? `${event.channel || 'comm'} sent` : event.type === 'repayment' ? 'Payment Received' : (event.category || event.type).replace(/_/g, ' ')}
+                                  </span>
+                                  {event.channel && event.type !== 'communication' && (
+                                    <span className="text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full uppercase">{event.channel}</span>
+                                  )}
+                                  {event.status && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                      statusVariant(event.status) === 'success' ? 'bg-emerald-50 text-emerald-700' :
+                                      statusVariant(event.status) === 'critical' ? 'bg-red-50 text-red-700' :
+                                      statusVariant(event.status) === 'warning' ? 'bg-amber-50 text-amber-700' :
+                                      'bg-blue-50 text-blue-700'
+                                    }`}>
+                                      {event.status}
+                                    </span>
+                                  )}
+                                </div>
+                                <time className="text-[10px] text-[var(--text-tertiary)] whitespace-nowrap">
+                                  {event.timestamp ? new Date(event.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </time>
+                              </div>
+
+                              {/* Communication details */}
+                              {event.type === 'communication' && (
+                                <div className="mt-2 space-y-2">
+                                  {event.details?.resolvedBody && (
+                                    <p className="text-sm text-[var(--text-secondary)] bg-[var(--surface-secondary)] p-2.5 rounded-lg border border-[var(--border-light)] line-clamp-3">
+                                      {event.details.resolvedBody}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-tertiary)]">
+                                    {event.details?.providerName && <span>Provider: <span className="font-medium">{event.details.providerName}</span></span>}
+                                    {event.details?.deliveredAt && <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Delivered {new Date(event.details.deliveredAt).toLocaleTimeString()}</span>}
+                                    {event.details?.readAt && <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-blue-500" /> Read {new Date(event.details.readAt).toLocaleTimeString()}</span>}
+                                    {event.details?.linkClicked && <span className="flex items-center gap-1"><MousePointerClick className="w-3 h-3 text-violet-500" /> Link Clicked</span>}
+                                  </div>
+                                  {event.details?.replyContent && (
+                                    <div className="text-sm text-[var(--text-primary)] bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                      <span className="text-[10px] font-bold text-blue-600 uppercase block mb-1">Borrower Reply</span>
+                                      &ldquo;{event.details.replyContent}&rdquo;
+                                    </div>
+                                  )}
+                                  {event.details?.failureReason && (
+                                    <div className="text-xs text-red-700 bg-red-50 p-2 rounded-lg flex items-center gap-2">
+                                      <XCircle className="w-3.5 h-3.5 shrink-0" />
+                                      {event.details.failureReason}{event.details.errorCode ? ` (${event.details.errorCode})` : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Repayment details */}
+                              {event.type === 'repayment' && (
+                                <div className="mt-2">
+                                  <div className="flex items-center gap-4">
+                                    <div className="text-lg font-bold text-emerald-600">₹{Number(event.details?.amount || 0).toLocaleString()}</div>
+                                    {event.details?.paymentType && <span className="text-[10px] font-medium px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full uppercase">{event.details.paymentType}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-tertiary)] mt-1">
+                                    {event.details?.paymentDate && <span>Payment Date: {event.details.paymentDate}</span>}
+                                    {event.details?.reference && <span>Ref: {event.details.reference}</span>}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Interaction details (PTP, dispute, etc.) */}
+                              {event.type === 'interaction' && (
+                                <div className="mt-2">
+                                  {event.details?.deliveryStatus && <p className="text-sm text-[var(--text-primary)]">Status: <span className="font-semibold">{event.details.deliveryStatus}</span></p>}
+                                  {event.details?.ptpDate && <p className="text-sm text-amber-700">PTP: ₹{Number(event.details.ptpAmount || 0).toLocaleString()} by {event.details.ptpDate}</p>}
+                                  {event.details?.replyContent && (
+                                    <div className="text-sm text-[var(--text-secondary)] bg-gray-50 p-2 rounded-lg border border-[var(--border-light)] mt-1">&ldquo;{event.details.replyContent}&rdquo;</div>
+                                  )}
+                                  {event.details?.failureReason && <p className="text-xs text-red-600 bg-red-50 p-2 rounded mt-1">{event.details.failureReason}</p>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <MessageSquare className="w-5 h-5 text-gray-400" />
-                </div>
-                <p className="text-sm text-[var(--text-secondary)]">No interaction events tracked yet.</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Wait for Webhook deliveries to populate timeline.</p>
-              </div>
-            )}
+                );
+              })()}
+            </div>
           </div>
 
           {/* Metadata */}

@@ -69,6 +69,9 @@ export * from './modules/interaction-events/interaction-events.service';
 export * from './modules/repayment/repayment.module';
 export * from './modules/repayment/repayment.service';
 
+export * from './modules/repayment-syncs/repayment-syncs.module';
+export * from './modules/repayment-syncs/repayment-syncs.service';
+
 export * from './modules/webhooks/webhooks.module';
 export * from './modules/webhooks/callback-normalizer.service';
 export * from './modules/webhooks/feedback-processor.service';

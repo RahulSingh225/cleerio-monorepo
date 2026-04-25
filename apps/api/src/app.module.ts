@@ -24,6 +24,7 @@ import {
   JourneysModule,
   InteractionEventsModule,
   RepaymentModule,
+  RepaymentSyncsModule,
 } from '@platform/domain';
 import { ReportsModule } from './modules/reports/reports.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -55,6 +56,7 @@ import { HealthModule } from './modules/health/health.module';
     JourneysModule,
     InteractionEventsModule,
     RepaymentModule,
+    RepaymentSyncsModule,
     WebhooksModule,
     DataPointsModule,
     PaymentLinksModule,

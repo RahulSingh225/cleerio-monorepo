@@ -15,6 +15,7 @@ import {
   JourneysModule,
   InteractionEventsModule,
   RepaymentModule,
+  RepaymentSyncsModule,
 } from '@platform/domain';
 import { HealthModule } from './health/health.module';
 
@@ -35,6 +36,7 @@ import { HealthModule } from './health/health.module';
     JourneysModule,
     InteractionEventsModule,
     RepaymentModule,
+    RepaymentSyncsModule,
     HealthModule,
   ],
 })

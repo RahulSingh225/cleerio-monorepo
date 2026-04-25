@@ -1,14 +1,15 @@
-import { Controller, Get, Query, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Param, Logger } from '@nestjs/common';
 import { PortfolioRecordsService } from './portfolio-records.service';
 import { ApiResponseConfig } from '@platform/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard, TenantContext } from '@platform/tenant';
-import { eq, and, count } from 'drizzle-orm';
-import { db, portfolioRecords } from '@platform/drizzle';
+import { eq, and, count, desc } from 'drizzle-orm';
+import { db, portfolioRecords, commEvents, deliveryLogs, interactionEvents, repaymentRecords } from '@platform/drizzle';
 
 @Controller('portfolio-records')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class PortfolioRecordsController {
+  private readonly logger = new Logger(PortfolioRecordsController.name);
   constructor(private readonly recordsService: PortfolioRecordsService) {}
 
   /**
@@ -147,5 +148,136 @@ export class PortfolioRecordsController {
   async findOne(@Param('id') id: string) {
     return this.recordsService.findFirst(eq(portfolioRecords.id, id));
   }
+
+  /**
+   * 360° Unified Timeline: Merges comm_events (with delivery_logs),
+   * interaction_events, and repayment_records into a single chronological feed.
+   */
+  @Get(':id/timeline')
+  @ApiResponseConfig({
+    message: 'Record timeline retrieved',
+    apiCode: 'RECORD_TIMELINE_RETRIEVED',
+  })
+  async getTimeline(@Param('id') id: string) {
+    this.logger.log(`[Timeline] Fetching 360° timeline for record ${id}`);
+    const timeline: any[] = [];
+
+    // 1. Comm Events + Delivery Logs
+    try {
+      const events = await db
+        .select()
+        .from(commEvents)
+        .where(eq(commEvents.recordId, id))
+        .orderBy(desc(commEvents.createdAt))
+        .execute();
+
+      for (const event of events) {
+        // Fetch delivery logs for this event
+        const logs = await db
+          .select()
+          .from(deliveryLogs)
+          .where(eq(deliveryLogs.eventId, event.id))
+          .orderBy(desc(deliveryLogs.createdAt))
+          .execute();
+
+        const latestLog = logs[0];
+
+        timeline.push({
+          id: event.id,
+          type: 'communication',
+          category: 'comm',
+          channel: event.channel,
+          status: latestLog?.deliveryStatus || event.status,
+          timestamp: event.sentAt || event.scheduledAt || event.createdAt,
+          details: {
+            resolvedBody: event.resolvedBody,
+            resolvedFields: event.resolvedFields,
+            scheduledAt: event.scheduledAt,
+            sentAt: event.sentAt,
+            deliveredAt: latestLog?.deliveredAt,
+            readAt: latestLog?.readAt,
+            repliedAt: latestLog?.repliedAt,
+            replyContent: latestLog?.replyContent,
+            linkClicked: latestLog?.linkClicked,
+            linkClickedAt: latestLog?.linkClickedAt,
+            errorCode: latestLog?.errorCode,
+            errorMessage: latestLog?.errorMessage,
+            failureReason: latestLog?.failureReason,
+            providerName: latestLog?.providerName,
+            providerMsgId: latestLog?.providerMsgId,
+          },
+        });
+      }
+      this.logger.log(`[Timeline] Found ${events.length} comm events for record ${id}`);
+    } catch (err: any) {
+      this.logger.warn(`[Timeline] Could not load comm events: ${err.message}`);
+    }
+
+    // 2. Interaction Events (PTP, replies, disputes, opt-outs, etc.)
+    try {
+      const interactions = await db
+        .select()
+        .from(interactionEvents)
+        .where(eq(interactionEvents.recordId, id))
+        .orderBy(desc(interactionEvents.createdAt))
+        .execute();
+
+      for (const interaction of interactions) {
+        timeline.push({
+          id: interaction.id,
+          type: 'interaction',
+          category: interaction.interactionType,
+          channel: interaction.channel,
+          status: null,
+          timestamp: interaction.createdAt,
+          details: interaction.details || {},
+        });
+      }
+      this.logger.log(`[Timeline] Found ${interactions.length} interaction events for record ${id}`);
+    } catch (err: any) {
+      this.logger.warn(`[Timeline] Could not load interaction events: ${err.message}`);
+    }
+
+    // 3. Repayment Records
+    try {
+      const repayments = await db
+        .select()
+        .from(repaymentRecords)
+        .where(eq(repaymentRecords.portfolioRecordId, id))
+        .orderBy(desc(repaymentRecords.createdAt))
+        .execute();
+
+      for (const repayment of repayments) {
+        timeline.push({
+          id: repayment.id,
+          type: 'repayment',
+          category: 'payment',
+          channel: null,
+          status: 'completed',
+          timestamp: repayment.createdAt || repayment.paymentDate,
+          details: {
+            amount: repayment.amount,
+            paymentDate: repayment.paymentDate,
+            paymentType: repayment.paymentType,
+            reference: repayment.reference,
+          },
+        });
+      }
+      this.logger.log(`[Timeline] Found ${repayments.length} repayment records for record ${id}`);
+    } catch (err: any) {
+      this.logger.warn(`[Timeline] Could not load repayment records: ${err.message}`);
+    }
+
+    // Sort all events chronologically (newest first)
+    timeline.sort((a, b) => {
+      const dateA = new Date(a.timestamp || 0).getTime();
+      const dateB = new Date(b.timestamp || 0).getTime();
+      return dateB - dateA;
+    });
+
+    this.logger.log(`[Timeline] Returning ${timeline.length} total events for record ${id}`);
+    return { data: timeline };
+  }
 }
+
 

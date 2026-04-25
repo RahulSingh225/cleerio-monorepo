@@ -27,9 +27,4 @@ export class RepaymentSyncsController {
     return { message: 'Repayment sync processing started' };
   }
 
-  @Get()
-  @ApiResponseConfig({ message: 'Repayment syncs listed', apiCode: 'REPAYMENT_SYNCS_LISTED' })
-  async findAll() {
-    return this.service.findMany();
-  }
 }

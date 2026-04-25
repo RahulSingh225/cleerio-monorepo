@@ -24,12 +24,19 @@ export default function RepaymentsPage() {
   };
 
   const handleUpload = async (file: File) => {
-    // In production, this would upload to S3 and create a sync
-    await api.post('/repayment-syncs', {
-      sourceType: file.name.endsWith('.xlsx') ? 'xlsx' : 'csv',
-      fileUrl: file.name,
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    await api.post('/repayment-syncs/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
-    fetchSyncs();
+    
+    // Give the backend a small delay to create the sync record
+    setTimeout(() => {
+      fetchSyncs();
+    }, 1000);
   };
 
   const totalUpdated = syncs.reduce((sum, s) => sum + (s.recordsUpdated || 0), 0);
