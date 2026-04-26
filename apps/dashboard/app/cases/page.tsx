@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/page-header';
 import { MetricCard } from '@/components/ui/metric-card';
@@ -10,8 +10,11 @@ import { DpdBadge, RiskBadge, StatusBadge } from '@/components/ui/status-badge';
 import { FilterBar, FilterDropdown } from '@/components/ui/filter-bar';
 import { Users, AlertTriangle, MessageSquare, Download, MoreVertical, Loader2 } from 'lucide-react';
 
-export default function CaseManagementPage() {
+function CasesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const assignmentFilter = searchParams.get('assignment');
+  const segmentIdFilter = searchParams.get('segmentId');
   const [page, setPage] = useState(1);
   const [records, setRecords] = useState<any[]>([]);
   const [portfolios, setPortfolios] = useState<any[]>([]);
@@ -20,14 +23,16 @@ export default function CaseManagementPage() {
   const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
-    loadPortfolios();
-  }, []);
+    if (!assignmentFilter && !segmentIdFilter) {
+      loadPortfolios();
+    }
+  }, [assignmentFilter, segmentIdFilter]);
 
   useEffect(() => {
-    if (selectedPortfolio) {
+    if (selectedPortfolio || assignmentFilter || segmentIdFilter) {
       loadRecords(selectedPortfolio);
     }
-  }, [selectedPortfolio, page]);
+  }, [selectedPortfolio, page, assignmentFilter, segmentIdFilter]);
 
   const loadPortfolios = async () => {
     try {
@@ -49,14 +54,31 @@ export default function CaseManagementPage() {
   const loadRecords = async (portfolioId: string) => {
     setLoading(true);
     try {
-      const res = await api.get(`/portfolio-records/portfolio/${portfolioId}`, {
-        params: { limit: 10, offset: (page - 1) * 10 },
-      });
+      let res;
+      if (assignmentFilter || segmentIdFilter) {
+        res = await api.get('/portfolio-records', {
+          params: { 
+            limit: 10, 
+            offset: (page - 1) * 10,
+            isAssigned: assignmentFilter === 'assigned' ? 'true' : assignmentFilter === 'unassigned' ? 'false' : undefined,
+            segmentId: segmentIdFilter || undefined
+          },
+        });
+      } else {
+        res = await api.get(`/portfolio-records/portfolio/${portfolioId}`, {
+          params: { limit: 10, offset: (page - 1) * 10 },
+        });
+      }
       const data = res.data.data || [];
       setRecords(data);
-      // Estimate total from portfolio
-      const portfolio = portfolios.find(p => p.id === portfolioId);
-      setTotalRecords(portfolio?.totalRecords || data.length);
+      
+      // Estimate total from portfolio or just use 100 for global filtered lists
+      if (assignmentFilter || segmentIdFilter) {
+        setTotalRecords(data.length === 10 ? page * 10 + 10 : (page - 1) * 10 + data.length);
+      } else {
+        const portfolio = portfolios.find(p => p.id === portfolioId);
+        setTotalRecords(portfolio?.totalRecords || data.length);
+      }
     } catch (err) {
       console.error('Failed to load records', err);
       setRecords([]);
@@ -181,21 +203,38 @@ export default function CaseManagementPage() {
       <div>
         <FilterBar
           actions={
-            <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--primary-hover)] transition-colors shadow-sm">
-              <Download className="w-4 h-4" />
-              Export Data
-            </button>
+            <div className="flex gap-3">
+              {(assignmentFilter || segmentIdFilter) && (
+                <button 
+                  onClick={() => router.push('/cases')}
+                  className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-white border border-[var(--border)] rounded-lg hover:bg-gray-50"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <button className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[var(--primary-hover)] transition-colors shadow-sm">
+                <Download className="w-4 h-4" />
+                Export Data
+              </button>
+            </div>
           }
         >
-          <FilterDropdown
-            label="Select Portfolio"
-            value={selectedPortfolio}
-            onChange={(val) => { setSelectedPortfolio(val); setPage(1); }}
-            options={portfolios.map(p => ({
-              label: `${p.allocationMonth} (${(p.totalRecords || 0).toLocaleString()} records)`,
-              value: p.id,
-            }))}
-          />
+          {!(assignmentFilter || segmentIdFilter) && (
+            <FilterDropdown
+              label="Select Portfolio"
+              value={selectedPortfolio}
+              onChange={(val) => { setSelectedPortfolio(val); setPage(1); }}
+              options={portfolios.map(p => ({
+                label: `${p.allocationMonth} (${(p.totalRecords || 0).toLocaleString()} records)`,
+                value: p.id,
+              }))}
+            />
+          )}
+          {(assignmentFilter || segmentIdFilter) && (
+            <div className="flex items-center px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg border border-blue-100">
+              Filtering by: {assignmentFilter ? `Assignment (${assignmentFilter})` : `Segment ID`}
+            </div>
+          )}
         </FilterBar>
 
         {loading ? (
@@ -230,5 +269,17 @@ export default function CaseManagementPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CaseManagementPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-12 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+      </div>
+    }>
+      <CasesContent />
+    </Suspense>
   );
 }

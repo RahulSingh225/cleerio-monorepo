@@ -105,26 +105,30 @@ export default function SegmentsPage() {
           <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Active</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{segments.filter(s => s.isActive).length}</p>
         </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Assigned</p>
-            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+        <Link href="/cases?assignment=assigned" className="block cursor-pointer hover:shadow-md transition-shadow h-full">
+          <div className="card p-4 h-full">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Assigned</p>
+              <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+            </div>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">{assignedRecords.toLocaleString()}</p>
           </div>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">{assignedRecords.toLocaleString()}</p>
-        </div>
-        <div className="card p-4 relative overflow-hidden">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Unassigned</p>
-            {unassignedRecords > 0 && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+        </Link>
+        <Link href="/cases?assignment=unassigned" className="block cursor-pointer hover:shadow-md transition-shadow h-full">
+          <div className="card p-4 relative overflow-hidden h-full">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Unassigned</p>
+              {unassignedRecords > 0 && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+            </div>
+            <p className={`text-2xl font-bold mt-1 ${unassignedRecords > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {unassignedRecords.toLocaleString()}
+            </p>
+            {/* Pulse indicator for unassigned */}
+            {unassignedRecords > 0 && (
+              <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-400 rounded-full animate-pulse" />
+            )}
           </div>
-          <p className={`text-2xl font-bold mt-1 ${unassignedRecords > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-            {unassignedRecords.toLocaleString()}
-          </p>
-          {/* Pulse indicator for unassigned */}
-          {unassignedRecords > 0 && (
-            <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-amber-400 rounded-full animate-pulse" />
-          )}
-        </div>
+        </Link>
         <div className="card p-4">
           <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Avg Success</p>
           <p className="text-2xl font-bold text-[var(--primary)] mt-1">{avgSuccess.toFixed(1)}%</p>

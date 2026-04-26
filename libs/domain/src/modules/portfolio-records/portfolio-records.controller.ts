@@ -3,7 +3,7 @@ import { PortfolioRecordsService } from './portfolio-records.service';
 import { ApiResponseConfig } from '@platform/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard, TenantContext } from '@platform/tenant';
-import { eq, and, count, desc } from 'drizzle-orm';
+import { eq, and, count, desc, isNotNull, isNull } from 'drizzle-orm';
 import { db, portfolioRecords, commEvents, deliveryLogs, interactionEvents, repaymentRecords } from '@platform/drizzle';
 
 @Controller('portfolio-records')
@@ -118,8 +118,38 @@ export class PortfolioRecordsController {
     apiCode: 'RECORD_COUNT',
   })
   async getCount() {
-    const count = await this.recordsService.totalCount();
+    const count = await this.recordsService.totalCount(eq(portfolioRecords.tenantId, TenantContext.tenantId!));
     return { data: { count } };
+  }
+
+  @Get()
+  @ApiResponseConfig({
+    message: 'Records retrieved successfully',
+    apiCode: 'RECORDS_RETRIEVED',
+  })
+  async findAll(
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('segmentId') segmentId?: string,
+    @Query('isAssigned') isAssigned?: string,
+  ) {
+    const filters = [eq(portfolioRecords.tenantId, TenantContext.tenantId!)];
+
+    if (segmentId) {
+      filters.push(eq(portfolioRecords.segmentId, segmentId));
+    }
+    
+    if (isAssigned === 'true') {
+      filters.push(isNotNull(portfolioRecords.segmentId));
+    } else if (isAssigned === 'false') {
+      filters.push(isNull(portfolioRecords.segmentId));
+    }
+
+    return this.recordsService.findMany({
+      where: and(...filters),
+      limit: limit || 50,
+      offset: offset || 0,
+    });
   }
 
   @Get('portfolio/:portfolioId')
