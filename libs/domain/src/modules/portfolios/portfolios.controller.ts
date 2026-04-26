@@ -21,7 +21,11 @@ export class PortfoliosController {
     message: 'Portfolio CSV uploaded and headers parsed for mapping',
     apiCode: 'PORTFOLIO_UPLOADED_FOR_MAPPING',
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50 MB
+    },
+  }))
   async uploadPortfolio(
     @UploadedFile() file: Express.Multer.File,
     @CurrentTenant() tenant: TenantContextData,
@@ -62,7 +66,11 @@ export class PortfoliosController {
     message: 'Portfolio ingestion started',
     apiCode: 'PORTFOLIO_INGEST_STARTED',
   })
-  @UseInterceptors(FileInterceptor('file')) // Requiring the file again for MVP simplicity
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50 MB
+    },
+  })) // Requiring the file again for MVP simplicity
   async ingestPortfolio(
     @Param('id') portfolioId: string,
     @UploadedFile() file: Express.Multer.File,

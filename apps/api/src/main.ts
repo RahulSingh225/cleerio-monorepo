@@ -1,5 +1,6 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -18,6 +19,10 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+
+  // Increase payload limits for large file uploads and JSON bodies (50MB)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Security Headers
   app.use(helmet());

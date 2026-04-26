@@ -1,10 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   // Use NestFactory.create for a hybrid application (HTTP + Microservice)
   const app = await NestFactory.create(AppModule);
+
+  // Increase payload limits for large JSON bodies/files (50MB)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Connect the Kafka microservice
   app.connectMicroservice<MicroserviceOptions>({

@@ -16,7 +16,11 @@ export class RepaymentSyncsController {
   @Post('upload')
   @Roles('tenant_admin', 'ops')
   @ApiResponseConfig({ message: 'Repayment sync started', apiCode: 'REPAYMENT_SYNC_STARTED' })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50 MB
+    },
+  }))
   async upload(
     @UploadedFile() file: Express.Multer.File,
     @CurrentTenant() tenant: TenantContextData,
