@@ -207,7 +207,7 @@ export default function TemplatesPage() {
                       <div key={i} className="flex gap-2 items-center">
                         <input type="text" value={v.vendorVar} onChange={(e) => handleUpdateVariable(i, 'vendorVar', e.target.value)} placeholder="Vendor Var (e.g. VAR1)" className="flex-1 bg-white border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
                         <span className="text-gray-400">→</span>
-                        <input type="text" list="core-system-fields" value={v.systemVar} onChange={(e) => handleUpdateVariable(i, 'systemVar', e.target.value)} placeholder="System Field (e.g. outstanding)" className="flex-1 bg-white border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
+                        <input type="text" list="core-system-fields" value={v.systemVar} onChange={(e) => handleUpdateVariable(i, 'systemVar', e.target.value)} placeholder="System Field or Static URL" className="flex-1 bg-white border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]" />
                         <button type="button" onClick={() => handleRemoveVariable(i)} className="p-2 text-gray-400 hover:bg-gray-100 hover:text-red-500 rounded-lg">
                           <Trash2 className="w-4 h-4" />
                         </button>

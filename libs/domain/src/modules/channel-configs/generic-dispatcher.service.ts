@@ -79,7 +79,13 @@ export class GenericDispatcherService {
     if (template.providerVariables && Array.isArray(template.providerVariables)) {
         template.providerVariables.forEach((mapping: any) => {
             if (mapping.vendorVar && mapping.systemVar) {
-                variables[mapping.vendorVar] = variables[mapping.systemVar] || '';
+                // If it's a known system variable, use its value. 
+                // Otherwise, treat the input as a hardcoded static string.
+                if (mapping.systemVar in variables) {
+                    variables[mapping.vendorVar] = variables[mapping.systemVar] || '';
+                } else {
+                    variables[mapping.vendorVar] = mapping.systemVar;
+                }
             }
         });
     }
