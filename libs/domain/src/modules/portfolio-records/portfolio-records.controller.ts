@@ -3,7 +3,7 @@ import { PortfolioRecordsService } from './portfolio-records.service';
 import { ApiResponseConfig } from '@platform/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard, TenantContext } from '@platform/tenant';
-import { eq, and, count, desc, isNotNull, isNull } from 'drizzle-orm';
+import { eq, and, count, desc, isNotNull, isNull, gte, lte, like, or, sql } from 'drizzle-orm';
 import { db, portfolioRecords, commEvents, deliveryLogs, interactionEvents, repaymentRecords } from '@platform/drizzle';
 
 @Controller('portfolio-records')
@@ -132,24 +132,82 @@ export class PortfolioRecordsController {
     @Query('offset') offset?: number,
     @Query('segmentId') segmentId?: string,
     @Query('isAssigned') isAssigned?: string,
+    @Query('search') search?: string,
+    @Query('dpdMin') dpdMin?: string,
+    @Query('dpdMax') dpdMax?: string,
+    @Query('product') product?: string,
+    @Query('lastDeliveryStatus') lastDeliveryStatus?: string,
+    @Query('riskBucket') riskBucket?: string,
+    @Query('ptpStatus') ptpStatus?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
+    @Query('portfolioId') portfolioId?: string,
   ) {
-    const filters = [eq(portfolioRecords.tenantId, TenantContext.tenantId!)];
+    const filters: any[] = [eq(portfolioRecords.tenantId, TenantContext.tenantId!)];
+
+    if (portfolioId) {
+      filters.push(eq(portfolioRecords.portfolioId, portfolioId));
+    }
 
     if (segmentId) {
       filters.push(eq(portfolioRecords.segmentId, segmentId));
     }
-    
+
     if (isAssigned === 'true') {
       filters.push(isNotNull(portfolioRecords.segmentId));
     } else if (isAssigned === 'false') {
       filters.push(isNull(portfolioRecords.segmentId));
     }
 
-    return this.recordsService.findMany({
-      where: and(...filters),
-      limit: limit || 50,
-      offset: offset || 0,
-    });
+    // Text search across name, mobile, userId, loanNumber
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      filters.push(
+        or(
+          like(portfolioRecords.name, term),
+          like(portfolioRecords.mobile, term),
+          like(portfolioRecords.userId, term),
+          like(portfolioRecords.loanNumber, term),
+        )!
+      );
+    }
+
+    // DPD range
+    if (dpdMin) filters.push(gte(portfolioRecords.currentDpd, Number(dpdMin)));
+    if (dpdMax) filters.push(lte(portfolioRecords.currentDpd, Number(dpdMax)));
+
+    // Product filter
+    if (product) filters.push(eq(portfolioRecords.product, product));
+
+    // Delivery status filter
+    if (lastDeliveryStatus) filters.push(eq(portfolioRecords.lastDeliveryStatus, lastDeliveryStatus));
+
+    // Risk bucket filter
+    if (riskBucket) filters.push(eq(portfolioRecords.riskBucket, riskBucket));
+
+    // PTP status filter
+    if (ptpStatus) filters.push(eq(portfolioRecords.ptpStatus, ptpStatus));
+
+    const whereClause = and(...filters);
+
+    // Get total count for pagination
+    const [countResult] = await db.select({ value: count() }).from(portfolioRecords).where(whereClause);
+    const totalCount = Number(countResult?.value || 0);
+
+    // Build ordered query
+    let orderClause;
+    if (sortBy === 'outstanding') orderClause = sortDir === 'asc' ? portfolioRecords.outstanding : desc(portfolioRecords.outstanding);
+    else if (sortBy === 'currentDpd') orderClause = sortDir === 'asc' ? portfolioRecords.currentDpd : desc(portfolioRecords.currentDpd);
+    else if (sortBy === 'name') orderClause = sortDir === 'asc' ? portfolioRecords.name : desc(portfolioRecords.name);
+    else orderClause = desc(portfolioRecords.createdAt);
+
+    const data = await db.select().from(portfolioRecords)
+      .where(whereClause)
+      .orderBy(orderClause)
+      .limit(Number(limit) || 20)
+      .offset(Number(offset) || 0);
+
+    return { data, meta: { totalCount } };
   }
 
   @Get('portfolio/:portfolioId')
