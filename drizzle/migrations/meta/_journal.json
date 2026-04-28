@@ -8,6 +8,13 @@
       "when": 1776591008906,
       "tag": "0000_unique_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777413414951,
+      "tag": "0001_magenta_power_man",
+      "breakpoints": true
     }
   ]
 }

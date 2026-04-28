@@ -20,6 +20,7 @@ import {
   Sparkles,
   Briefcase,
   Upload,
+  TableProperties,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -72,6 +73,7 @@ export function Sidebar() {
             label: 'Analytics',
             items: [
               { name: 'Reports', href: '/reports', icon: BarChart3 },
+              { name: 'Data Explorer', href: '/data-explorer', icon: TableProperties },
               { name: 'Repayments', href: '/repayments', icon: CreditCard },
               { name: 'AI Insights', href: '/ai-insights', icon: Sparkles },
             ],

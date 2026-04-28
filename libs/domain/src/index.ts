@@ -81,3 +81,9 @@ export * from './modules/data-points/data-points.service';
 
 export * from './modules/payment-links/payment-links.module';
 export * from './modules/payment-links/payment-links.service';
+
+export * from './modules/data-explorer/data-explorer.module';
+export * from './modules/data-explorer/data-explorer.service';
+
+export * from './modules/ivr-syncs/ivr-syncs.module';
+export * from './modules/ivr-syncs/ivr-syncs.service';

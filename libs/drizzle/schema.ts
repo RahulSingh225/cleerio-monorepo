@@ -785,3 +785,25 @@ export const aiInsights = pgTable(
     createdBy: varchar('created_by', { length: 30 }).default('ai_agent'),
   }
 );
+
+// ─── SAVED QUERIES (Data Explorer) ──────────────────────────
+
+export const savedQueries = pgTable(
+  'saved_queries',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_ulid()`),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: varchar('name', { length: 150 }).notNull(),
+    description: text('description'),
+    querySpec: jsonb('query_spec').notNull(),   // The full DataExplorerQuery JSON
+    createdBy: uuid('created_by').references(() => tenantUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    tenantIdIdx: index('saved_queries_tenant_id_idx').on(t.tenantId),
+    tenantNameIdx: uniqueIndex('saved_queries_tenant_name_idx').on(t.tenantId, t.name),
+  })
+);
