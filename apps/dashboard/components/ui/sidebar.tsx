@@ -21,6 +21,7 @@ import {
   Briefcase,
   Upload,
   TableProperties,
+  Headphones,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/use-auth-store';
 
@@ -67,6 +68,7 @@ export function Sidebar() {
               { name: 'Comm Events', href: '/communications', icon: Radio },
               { name: 'Delivery Logs', href: '/delivery-logs', icon: MessageSquare },
               { name: 'Interactions', href: '/interactions', icon: Bot },
+              { name: 'IVR Syncs', href: '/ivr-syncs', icon: Headphones },
             ],
           },
           {
