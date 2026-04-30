@@ -15,6 +15,13 @@
       "when": 1777413414951,
       "tag": "0001_magenta_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777555285637,
+      "tag": "0002_pale_spacker_dave",
+      "breakpoints": true
     }
   ]
 }

@@ -506,7 +506,7 @@ export const commEvents = pgTable(
     recordId: uuid('record_id')
       .notNull()
       .references(() => portfolioRecords.id),
-    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id),
+    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id, { onDelete: 'set null' }),
     segmentId: uuid('segment_id').references(() => segments.id),
     channel: varchar('channel', { length: 20 }).notNull(),
     status: varchar('status', { length: 20 }).default('scheduled'),
@@ -573,7 +573,7 @@ export const interactionEvents = pgTable(
       .notNull()
       .references(() => portfolioRecords.id),
     commEventId: uuid('comm_event_id').references(() => commEvents.id),
-    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id),
+    journeyStepId: uuid('journey_step_id').references(() => journeySteps.id, { onDelete: 'set null' }),
     interactionType: varchar('interaction_type', { length: 50 }).notNull(), // ptp | dispute | callback_request | link_click | reply | opt_out
     channel: varchar('channel', { length: 20 }),
     details: jsonb('details').default({}),

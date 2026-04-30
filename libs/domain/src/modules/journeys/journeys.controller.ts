@@ -87,4 +87,11 @@ export class JourneysController {
     const [activated] = await this.journeysService.activate(id);
     return { data: activated };
   }
+
+  @Post(':id/deactivate')
+  @Roles('tenant_admin')
+  async deactivate(@Param('id') id: string) {
+    const [deactivated] = await this.journeysService.deactivate(id);
+    return { data: deactivated };
+  }
 }

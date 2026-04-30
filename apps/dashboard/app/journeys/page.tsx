@@ -340,6 +340,20 @@ export default function JourneyBuilderPage() {
     }
   };
 
+  const toggleJourneyActive = async (e: React.MouseEvent, j: any) => {
+    e.stopPropagation();
+    try {
+      if (j.isActive) {
+        await api.post(`/journeys/${j.id}/deactivate`);
+      } else {
+        await api.post(`/journeys/${j.id}/deploy`);
+      }
+      fetchJourneys();
+    } catch (err) {
+      alert('Failed to toggle journey status');
+    }
+  };
+
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds: Edge[]) =>
       addEdge({
@@ -433,15 +447,30 @@ export default function JourneyBuilderPage() {
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
-                        {j.name}
-                      </h3>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                        j.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {j.isActive ? 'Active' : 'Draft'}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+                          {j.name}
+                        </h3>
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          j.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {j.isActive ? 'Active' : 'Draft'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => toggleJourneyActive(e, j)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          j.isActive ? 'bg-emerald-500' : 'bg-gray-200'
+                        }`}
+                        title={j.isActive ? 'Deactivate Journey' : 'Activate Journey'}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            j.isActive ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
                     </div>
                     {j.description && (
                       <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">{j.description}</p>

@@ -1,4 +1,15 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength, IsArray } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, MaxLength, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ProviderVariableDto {
+  @IsNotEmpty()
+  @IsString()
+  vendorVar: string;
+
+  @IsNotEmpty()
+  @IsString()
+  systemVar: string;
+}
 
 export class CreateTemplateDto {
   @IsNotEmpty()
@@ -22,7 +33,9 @@ export class CreateTemplateDto {
 
   @IsOptional()
   @IsArray()
-  providerVariables?: Record<string, any>[];
+  @ValidateNested({ each: true })
+  @Type(() => ProviderVariableDto)
+  providerVariables?: ProviderVariableDto[];
 
   @IsOptional()
   @IsString()
