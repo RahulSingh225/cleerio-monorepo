@@ -214,17 +214,20 @@ export default function TemplatesPage() {
                       </div>
                     ))}
                     <datalist id="core-system-fields">
-                      {systemFields.map((field) => (
-                        <option key={field.id} value={field.fieldKey}>
-                          {field.displayLabel || field.headerName}
-                        </option>
-                      ))}
+                      {systemFields.map((field) => {
+                        const varKey = field.isCore ? field.displayLabel : field.headerName;
+                        return (
+                          <option key={field.id} value={`{{${varKey}}}`}>
+                            {field.displayLabel || field.headerName} {field.isCore ? '(core)' : '(dynamic)'}
+                          </option>
+                        );
+                      })}
                       {/* Fallback to display even if DB is entirely empty */}
                       {systemFields.length === 0 && (
                         <>
-                          <option value="name">Customer Name</option>
-                          <option value="mobile">Mobile Number</option>
-                          <option value="outstanding">Outstanding Balance</option>
+                          <option value="{{name}}">Customer Name</option>
+                          <option value="{{mobile}}">Mobile Number</option>
+                          <option value="{{outstanding}}">Outstanding Balance</option>
                         </>
                       )}
                     </datalist>

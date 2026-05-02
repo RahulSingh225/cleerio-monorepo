@@ -11,7 +11,7 @@ export class TemplateRendererService {
     // Replace standard fields using regex lookup
     rendered = rendered.replace(/\{\{([^}]+)\}\}/g, (match, fieldName) => {
       const value = dynamicFields[fieldName.trim()];
-      return value !== undefined && value !== null ? String(value) : match; // preserve if missing
+      return value !== undefined && value !== null ? String(value) : ''; // strip if missing
     });
 
     return rendered;
@@ -20,23 +20,35 @@ export class TemplateRendererService {
   /**
    * Recursively resolves variables in a JSON object or array.
    */
-  renderObject(obj: any, variables: Record<string, any>): any {
+  renderObject(obj: any, variables: Record<string, any>, templateVars?: Record<string, any>): any {
     if (typeof obj === 'string') {
       return this.renderBody(obj, variables);
     }
     
     if (Array.isArray(obj)) {
-      return obj.map(item => this.renderObject(item, variables));
+      return obj.map(item => this.renderObject(item, variables, templateVars));
     }
     
     if (obj !== null && typeof obj === 'object') {
       const result: Record<string, any> = {};
+      let injectTemplateVars = false;
+
       for (const key in obj) {
-        result[key] = this.renderObject(obj[key], variables);
+        if (key === '__TEMPLATE_VARIABLES__' && obj[key] === true) {
+          injectTemplateVars = true;
+          continue; // skip adding to result
+        }
+        result[key] = this.renderObject(obj[key], variables, templateVars);
       }
+
+      if (injectTemplateVars && templateVars) {
+        Object.assign(result, templateVars);
+      }
+
       return result;
     }
     
     return obj;
   }
 }
+

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { db, deliveryLogs, commEvents } from '@platform/drizzle';
-import { eq } from 'drizzle-orm';
+import { db, deliveryLogs, commEvents, tenantFieldRegistry } from '@platform/drizzle';
+import { eq, and } from 'drizzle-orm';
 import { TemplateRendererService } from '../comm-templates/template-renderer.service';
 
 @Injectable()
@@ -25,79 +25,83 @@ export class GenericDispatcherService {
       throw new Error(`Channel ${channelConfig.channel} for tenant ${tenantId} missing dispatchApiTemplate`);
     }
 
-    // 1. Prepare variables for resolution
-    const variables: Record<string, any> = {
-      // System Fields (original core)
-      name: record.name,
-      mobile: record.mobile,
-      userId: record.userId,
-      product: record.product,
-      currentDpd: record.currentDpd,
-      outstanding: record.outstanding,
-      overdue: record.outstanding, // fallback
-      employerName: record.employerName,
-      
-      // Snake_case aliases for core
-      user_id: record.userId,
-      current_dpd: record.currentDpd,
-      employer_name: record.employerName,
+    // 1. Prepare variables for resolution — dynamically from the full record
+    const variables: Record<string, any> = {};
 
-      // Promoted core fields (from stakeholder data requirements)
-      loanNumber: record.loanNumber,
-      email: record.email,
-      dueDate: record.dueDate,
-      emiAmount: record.emiAmount,
-      language: record.language,
-      state: record.state,
-      city: record.city,
-      cibilScore: record.cibilScore,
-      salaryDate: record.salaryDate,
-      enachEnabled: record.enachEnabled,
-      loanAmount: record.loanAmount,
-      
-      // Snake_case aliases for promoted core
-      loan_number: record.loanNumber,
-      due_date: record.dueDate,
-      emi_amount: record.emiAmount,
-      cibil_score: record.cibilScore,
-      salary_date: record.salaryDate,
-      enach_enabled: record.enachEnabled,
-      loan_amount: record.loanAmount,
+    // Populate all record columns (covers every core + feedback column automatically)
+    for (const [key, value] of Object.entries(record)) {
+      if (key === 'dynamicFields' || key === 'deletedAt') continue;
+      variables[key] = value;
+      // Add snake_case alias: employerName → employer_name
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (snakeKey !== key) variables[snakeKey] = value;
+    }
 
-      // Dynamic fields from portfolio_records.dynamic_fields
-      ...(record.dynamicFields as Record<string, any> || {}),
+    // Legacy alias
+    variables['overdue'] = record.outstanding;
 
-      // Provider specifics (Precedence: Template > Record)
-      TEMPLATE_ID: template?.providerTemplateId,
-      templateId: template?.providerTemplateId,
-      template_id: template?.providerTemplateId,
-      providerTemplateId: template?.providerTemplateId,
-    };
+    // Spread dynamic fields from portfolio_records.dynamic_fields
+    const dynFields = (record.dynamicFields as Record<string, any>) || {};
+    Object.assign(variables, dynFields);
+
+    // Provider specifics (Precedence: Template > Record)
+    variables['TEMPLATE_ID'] = template?.providerTemplateId;
+    variables['templateId'] = template?.providerTemplateId;
+    variables['template_id'] = template?.providerTemplateId;
+    variables['providerTemplateId'] = template?.providerTemplateId;
+
+    // Resolve fieldN aliases from tenant_field_registry
+    // Maps abstract keys like "field4" → the actual value (e.g. record.name)
+    try {
+      const registryFields = await db
+        .select({ fieldKey: tenantFieldRegistry.fieldKey, displayLabel: tenantFieldRegistry.displayLabel, headerName: tenantFieldRegistry.headerName, isCore: tenantFieldRegistry.isCore })
+        .from(tenantFieldRegistry)
+        .where(eq(tenantFieldRegistry.tenantId, tenantId));
+
+      for (const rf of registryFields) {
+        // Core fields: displayLabel is the record column name (e.g. "name", "outstanding")
+        // Dynamic fields: headerName is the key in dynamicFields JSONB (e.g. "overdue_amount")
+        const resolvedKey = rf.isCore ? rf.displayLabel : rf.headerName;
+        if (resolvedKey && variables[resolvedKey] !== undefined) {
+          variables[rf.fieldKey] = variables[resolvedKey];
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Could not resolve field registry aliases: ${(err as Error).message}`);
+    }
+
 
     // 2. Resolve providerVariables from template if present
     // These are specific mappings like {"vendorVar": "VAR1", "systemVar": "name"}
+    const templateVars: Record<string, any> = {};
     if (template.providerVariables && Array.isArray(template.providerVariables)) {
         template.providerVariables.forEach((mapping: any) => {
             if (mapping.vendorVar && mapping.systemVar) {
-                // If it's a known system variable, use its value. 
-                // Otherwise, treat the input as a hardcoded static string.
-                if (mapping.systemVar in variables) {
-                    variables[mapping.vendorVar] = variables[mapping.systemVar] || '';
-                } else {
-                    variables[mapping.vendorVar] = mapping.systemVar;
+                let val = mapping.systemVar;
+                if (typeof val === 'string' && val.includes('{{')) {
+                    // It's a template string (e.g. "{{field4}}" or "https://pay.me/{{outstanding}}")
+                    val = this.templateRenderer.renderBody(val, variables);
+                } else if (mapping.systemVar in variables) {
+                    // Legacy support: if they just typed "name" or "mobile" without brackets
+                    val = variables[mapping.systemVar] || '';
                 }
+                
+                variables[mapping.vendorVar] = val;
+                templateVars[mapping.vendorVar] = val;
             }
         });
     }
 
     // 3. Resolve the API Blueprint
     const resolvedUrl = this.templateRenderer.renderBody(dispatchApiTemplate.url, variables);
-    const resolvedHeaders = this.templateRenderer.renderObject(dispatchApiTemplate.headers || {}, variables);
-    const resolvedBody = this.templateRenderer.renderObject(dispatchApiTemplate.bodyTemplate || {}, variables);
+    const resolvedHeaders = this.templateRenderer.renderObject(dispatchApiTemplate.headers || {}, variables, templateVars);
+    const resolvedBody = this.templateRenderer.renderObject(dispatchApiTemplate.bodyTemplate || {}, variables, templateVars);
     const method = (dispatchApiTemplate.method || 'POST').toUpperCase();
 
     // 4. Fire the HTTP request
     this.logger.log(`Dispatching ${channelConfig.channel} to ${record.mobile} via ${resolvedUrl}`);
+    this.logger.debug(`Template vars resolved: ${JSON.stringify(templateVars)}`);
+    this.logger.debug(`Resolved body: ${JSON.stringify(resolvedBody)}`);
     
     let response;
     let status = 'sent';
