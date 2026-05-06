@@ -33,6 +33,10 @@ function NewSegmentPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
+  // Portfolio selection
+  const [portfolios, setPortfolios] = useState<any[]>([]);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>('');
+
   // Live preview state
   const [previewRecords, setPreviewRecords] = useState<any[]>([]);
   const [previewLoading, setPreviewLoading] = useState(true);
@@ -40,7 +44,7 @@ function NewSegmentPage() {
   const [otherSegments, setOtherSegments] = useState<any[]>([]);
   const [overlapError, setOverlapError] = useState<{count: number, names: string[]} | null>(null);
 
-  // Load available fields from actual portfolio data (not field registry)
+  // Load available fields and portfolios
   useEffect(() => {
     // Get all available fields by introspecting actual portfolio record data
     api.get('/portfolio-records/fields')
@@ -50,7 +54,6 @@ function NewSegmentPage() {
       })
       .catch((err) => {
         console.warn('Failed to load portfolio fields, using fallback core fields', err);
-        // Fallback to core fields only
         setFields([
           { key: 'current_dpd', label: 'Current DPD', dataType: 'number', isCore: true },
           { key: 'outstanding', label: 'Outstanding Amount', dataType: 'number', isCore: true },
@@ -59,19 +62,25 @@ function NewSegmentPage() {
         ]);
       });
 
+    // Load all portfolios for the selector
+    api.get('/portfolios')
+      .then(res => setPortfolios(res.data.data || []))
+      .catch(() => console.warn('Failed to load portfolios'));
+
     // Load ALL active segments for overlap validation
     api.get('/segments')
       .then(res => {
         const segmentsList = res.data.data || [];
-        // Exclude the one being edited, and exclude default catch-all "Others"
         const others = segmentsList.filter((s: any) => s.isActive && !s.isDefault && s.id !== editId);
         setOtherSegments(others);
       })
       .catch(() => console.warn('Failed to load other segments for overlap check'));
-
-    // Load portfolio records for live coverage preview
-    loadRecordsForPreview();
   }, [editId]);
+
+  // Reload preview when portfolio selection changes
+  useEffect(() => {
+    loadRecordsForPreview();
+  }, [selectedPortfolioId]);
 
   // If editing, load existing segment
   useEffect(() => {
@@ -84,6 +93,7 @@ function NewSegmentPage() {
           setCode(seg.code || '');
           setDescription(seg.description || '');
           setPriority(seg.priority || 100);
+          if (seg.portfolioId) setSelectedPortfolioId(seg.portfolioId);
           if (seg.criteriaJsonb) {
             setCriteria(seg.criteriaJsonb);
           }
@@ -100,16 +110,21 @@ function NewSegmentPage() {
   const loadRecordsForPreview = async () => {
     setPreviewLoading(true);
     try {
-      // Try to get records from the most recent portfolio
-      const pRes = await api.get('/portfolios');
-      const portfolios = pRes.data.data || [];
-      if (portfolios.length > 0) {
-        // Get the most recent completed portfolio
-        const completed = portfolios.find((p: any) => p.status === 'completed') || portfolios[0];
-        const rRes = await api.get(`/portfolio-records/portfolio/${completed.id}?limit=2000`);
+      if (selectedPortfolioId) {
+        // Load records only from the selected portfolio
+        const rRes = await api.get(`/portfolio-records/portfolio/${selectedPortfolioId}?limit=2000`);
         setPreviewRecords(rRes.data.data || []);
       } else {
-        setPreviewRecords([]);
+        // No portfolio selected — try most recent completed
+        const pRes = await api.get('/portfolios');
+        const pList = pRes.data.data || [];
+        if (pList.length > 0) {
+          const completed = pList.find((p: any) => p.status === 'completed') || pList[0];
+          const rRes = await api.get(`/portfolio-records/portfolio/${completed.id}?limit=2000`);
+          setPreviewRecords(rRes.data.data || []);
+        } else {
+          setPreviewRecords([]);
+        }
       }
     } catch {
       setPreviewRecords([]);
@@ -200,6 +215,7 @@ function NewSegmentPage() {
           code,
           description,
           priority,
+          portfolioId: selectedPortfolioId || null,
           criteriaJsonb: criteria,
         });
       } else {
@@ -208,6 +224,7 @@ function NewSegmentPage() {
           code,
           description,
           priority,
+          portfolioId: selectedPortfolioId || null,
           criteriaJsonb: criteria,
         });
       }
@@ -294,6 +311,20 @@ function NewSegmentPage() {
             className="w-full text-sm border border-[var(--border)] rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-30 focus:border-[var(--primary)]"
           />
           <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Lower = evaluated first</p>
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs font-medium text-[var(--text-secondary)] block mb-1.5">Target Portfolio *</label>
+          <select
+            value={selectedPortfolioId}
+            onChange={(e) => setSelectedPortfolioId(e.target.value)}
+            className="w-full text-sm border border-[var(--border)] rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-opacity-30 focus:border-[var(--primary)]"
+          >
+            <option value="">Select a portfolio...</option>
+            {portfolios.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name} ({p.status})</option>
+            ))}
+          </select>
+          <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Segments are scoped to a specific portfolio. Only records from this portfolio will be evaluated.</p>
         </div>
       </div>
 

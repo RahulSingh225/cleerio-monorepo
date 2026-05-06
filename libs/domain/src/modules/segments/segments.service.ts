@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, desc, sql, count } from 'drizzle-orm';
+import { eq, and, desc, sql, count, isNull, or } from 'drizzle-orm';
 import { db, segments, portfolioRecords } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 
@@ -24,6 +24,9 @@ function isGroup(c: CriteriaCondition | CriteriaGroup): c is CriteriaGroup {
 const CORE_FIELDS = new Set([
   'user_id', 'mobile', 'name', 'product', 'employer_id',
   'outstanding', 'current_dpd', 'dpd_bucket', 'total_repaid',
+  'loan_number', 'email', 'due_date', 'emi_amount', 'language',
+  'state', 'city', 'cibil_score', 'salary_date', 'enach_enabled',
+  'loan_amount'
 ]);
 
 /**
@@ -100,12 +103,17 @@ export class SegmentsService extends BaseRepository<typeof segments> {
     return this._db.insert(segments).values(data).returning();
   }
 
-  async findAllWithCounts() {
+  async findAllWithCounts(portfolioId?: string) {
     const segmentList = await this.findMany({ orderBy: desc(segments.priority) });
+
+    // Filter by portfolio if provided
+    const filtered = portfolioId
+      ? segmentList.filter((s: any) => s.portfolioId === portfolioId || !s.portfolioId)
+      : segmentList;
 
     // Attach record counts
     const result = await Promise.all(
-      segmentList.map(async (seg: any) => {
+      filtered.map(async (seg: any) => {
         const [countResult] = await this._db
           .select({ value: count() })
           .from(portfolioRecords)
@@ -145,23 +153,29 @@ export class SegmentsService extends BaseRepository<typeof segments> {
       .returning();
   }
 
-  async getDefaultSegment(tenantId: string) {
+  async getDefaultSegment(tenantId: string, portfolioId?: string) {
+    // Look for a portfolio-scoped default first, then tenant-wide
+    const conditions = portfolioId
+      ? [eq(segments.tenantId, tenantId), eq(segments.isDefault, true), eq(segments.portfolioId, portfolioId)]
+      : [eq(segments.tenantId, tenantId), eq(segments.isDefault, true)];
+
     const existing = await this._db
       .select()
       .from(segments)
-      .where(and(eq(segments.tenantId, tenantId), eq(segments.isDefault, true)))
+      .where(and(...conditions))
       .limit(1)
       .execute();
 
     if (existing.length > 0) return existing[0];
 
-    // Auto-create default "Others" segment
+    // Auto-create portfolio-scoped "Others" segment
     const [created] = await this._db
       .insert(segments)
       .values({
         tenantId,
+        portfolioId: portfolioId || null,
         name: 'Others',
-        code: 'others',
+        code: portfolioId ? `others_${portfolioId.substring(0, 8)}` : 'others',
         description: 'Default catch-all segment for unmatched records',
         isDefault: true,
         isActive: true,
@@ -172,11 +186,20 @@ export class SegmentsService extends BaseRepository<typeof segments> {
     return created;
   }
 
-  async getActiveSegmentsByPriority(tenantId: string) {
+  async getActiveSegmentsByPriority(tenantId: string, portfolioId?: string) {
+    // Return segments matching the specific portfolio OR tenant-wide (null portfolioId)
+    const conditions = portfolioId
+      ? [
+          eq(segments.tenantId, tenantId),
+          eq(segments.isActive, true),
+          or(eq(segments.portfolioId, portfolioId), isNull(segments.portfolioId)),
+        ]
+      : [eq(segments.tenantId, tenantId), eq(segments.isActive, true)];
+
     return this._db
       .select()
       .from(segments)
-      .where(and(eq(segments.tenantId, tenantId), eq(segments.isActive, true)))
+      .where(and(...conditions))
       .orderBy(segments.priority)
       .execute();
   }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, or, isNull } from 'drizzle-orm';
 import {
   db, segmentationRuns, segments, portfolioRecords,
 } from '@platform/drizzle';
@@ -14,11 +14,15 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
   }
 
   async startRun(tenantId: string, portfolioId?: string, triggeredBy?: string) {
-    // Count records to segment
+    // Count records to segment — scoped to portfolio if provided
+    const whereClause = portfolioId
+      ? and(eq(portfolioRecords.tenantId, tenantId), eq(portfolioRecords.portfolioId, portfolioId))
+      : eq(portfolioRecords.tenantId, tenantId);
+
     const [totalResult] = await db
       .select({ value: count() })
       .from(portfolioRecords)
-      .where(eq(portfolioRecords.tenantId, tenantId))
+      .where(whereClause)
       .execute();
 
     const [run] = await db
@@ -46,23 +50,52 @@ export class SegmentationRunsService extends BaseRepository<typeof segmentationR
     if (!run) throw new Error(`Segmentation run ${runId} not found`);
 
     const tenantId = run.tenantId;
+    const portfolioId = run.portfolioId;
 
-    // Fetch all active segments ordered by priority
+    // Fetch active segments — portfolio-scoped + tenant-wide fallbacks
     const activeSegments = await db
       .select()
       .from(segments)
-      .where(and(eq(segments.tenantId, tenantId), eq(segments.isActive, true)))
+      .where(and(
+        eq(segments.tenantId, tenantId),
+        eq(segments.isActive, true),
+        portfolioId
+          ? or(eq(segments.portfolioId, portfolioId), isNull(segments.portfolioId))
+          : undefined,
+      ))
       .orderBy(segments.priority)
       .execute();
 
-    // Ensure default segment exists
-    const defaultSeg = activeSegments.find((s: any) => s.isDefault);
+    // Ensure a portfolio-scoped default segment exists
+    let defaultSeg = activeSegments.find((s: any) => s.isDefault && (s.portfolioId === portfolioId || !s.portfolioId));
+    if (!defaultSeg && portfolioId) {
+      // Auto-create portfolio-scoped default
+      const [created] = await db
+        .insert(segments)
+        .values({
+          tenantId,
+          portfolioId,
+          name: 'Others',
+          code: `others_${portfolioId.substring(0, 8)}`,
+          description: 'Default catch-all segment for this portfolio',
+          isDefault: true,
+          isActive: true,
+          priority: 999,
+          criteriaJsonb: { logic: 'AND', conditions: [] },
+        })
+        .returning();
+      defaultSeg = created;
+    }
 
-    // Fetch all records for tenant
+    // Fetch records — scoped to this portfolio only
+    const recordWhereClause = portfolioId
+      ? and(eq(portfolioRecords.tenantId, tenantId), eq(portfolioRecords.portfolioId, portfolioId))
+      : eq(portfolioRecords.tenantId, tenantId);
+
     const records = await db
       .select()
       .from(portfolioRecords)
-      .where(eq(portfolioRecords.tenantId, tenantId))
+      .where(recordWhereClause)
       .execute();
 
     let processed = 0;

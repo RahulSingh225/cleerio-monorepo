@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { db, taskQueue, commEvents, portfolioRecords, commTemplates, channelConfigs, deliveryLogs, journeySteps } from '@platform/drizzle';
+import { db, taskQueue, commEvents, portfolioRecords, commTemplates, channelConfigs, deliveryLogs, journeySteps, tenants } from '@platform/drizzle';
 import { BaseRepository } from '@platform/drizzle/repository';
 import { eq, and, sql, lte } from 'drizzle-orm';
 import {
@@ -65,7 +65,7 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
             await this.handlePortfolioIngest(job.payload.portfolioId, job.payload.tenantId);
             break;
           case 'segmentation.run':
-            await this.handleSegmentationRun(job.payload.tenantId);
+            await this.handleSegmentationRun(job.payload.tenantId, job.payload.portfolioId);
             break;
           case 'comm.dispatch':
             await this.handleCommDispatch(job.payload.tenantId, job.id);
@@ -136,13 +136,24 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
   async handlePortfolioIngest(portfolioId: string, tenantId: string) {
     this.logger.log(`Processing ingestion for portfolio: ${portfolioId}`);
 
-    // In v2, after portfolio ingestion, we trigger a segmentation run
-    // to assign records to segments based on the new criteria engine
+    // Check tenant's autoSegmentOnUpload flag
+    const [tenant] = await db
+      .select({ autoSegmentOnUpload: tenants.autoSegmentOnUpload })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (!tenant?.autoSegmentOnUpload) {
+      this.logger.log(`Auto-segmentation disabled for tenant ${tenantId}. Skipping segmentation.run.`);
+      return;
+    }
+
+    // Queue a portfolio-scoped segmentation run
     await this._db.insert(taskQueue).values({
       tenantId,
       jobType: 'segmentation.run',
       status: 'pending',
-      payload: { tenantId, triggeredBy: 'portfolio.ingest', portfolioId },
+      payload: { tenantId, portfolioId, triggeredBy: 'portfolio.ingest' },
       priority: 2,
       runAfter: new Date(),
     });
@@ -152,10 +163,10 @@ export class JobQueueService extends BaseRepository<typeof taskQueue> {
 
   // ─── SEGMENTATION.RUN HANDLER ────────────────────────────────
 
-  async handleSegmentationRun(tenantId: string) {
-    this.logger.log(`Processing segmentation run for tenant: ${tenantId}`);
-    // Create a run record first, then process it
-    const run = await this.segmentationRunsService.startRun(tenantId);
+  async handleSegmentationRun(tenantId: string, portfolioId?: string) {
+    this.logger.log(`Processing segmentation run for tenant: ${tenantId}, portfolio: ${portfolioId || 'all'}`);
+    // Create a portfolio-scoped run record, then process it
+    const run = await this.segmentationRunsService.startRun(tenantId, portfolioId);
     await this.segmentationRunsService.processRun(run.id);
     this.logger.log(`Completed segmentation run ${run.id} for tenant: ${tenantId}`);
   }

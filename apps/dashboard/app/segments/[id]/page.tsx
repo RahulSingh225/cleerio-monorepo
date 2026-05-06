@@ -27,6 +27,7 @@ export default function SegmentDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   
   const [segment, setSegment] = useState<any>(null);
+  const [portfolios, setPortfolios] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,17 @@ export default function SegmentDetailPage({ params }: { params: Promise<{ id: st
       setIsLoading(true);
       const res = await api.get(`/segments/${id}`);
       setSegment(res.data.data);
+
+      try {
+        const portRes = await api.get('/portfolios');
+        const portMap: Record<string, any> = {};
+        (portRes.data.data || []).forEach((p: any) => {
+          portMap[p.id] = p; // Store the entire object
+        });
+        setPortfolios(portMap);
+      } catch (err) {
+        console.warn('Failed to load portfolios for mapping');
+      }
     } catch (err) {
       setError('Failed to load segment details.');
     } finally {
@@ -50,7 +62,7 @@ export default function SegmentDetailPage({ params }: { params: Promise<{ id: st
   const triggerSegmentation = async () => {
     setIsRunning(true);
     try {
-      await api.post('/segments/run');
+      await api.post('/segments/run', { portfolioId: segment?.portfolioId });
       // Briefly show running state then refresh
       setTimeout(() => {
         fetchSegmentDetails();
@@ -108,7 +120,7 @@ export default function SegmentDetailPage({ params }: { params: Promise<{ id: st
 
       <PageHeader
         title={segment.name}
-        subtitle={`${segment.code} • Priority ${segment.priority}`}
+        subtitle={`${segment.code} • Priority ${segment.priority}${segment.portfolioId && portfolios[segment.portfolioId] ? ` • Portfolio: ${portfolios[segment.portfolioId].name}` : segment.portfolioId ? '' : ' • Tenant-wide'}`}
         actions={
           <div className="flex items-center gap-3">
             <button
@@ -219,6 +231,45 @@ export default function SegmentDetailPage({ params }: { params: Promise<{ id: st
               <StatRow icon={<Users className="w-3.5 h-3.5" />} label="Type" value={segment.isDefault ? 'Fallback Pool' : 'Targeted Rule'} />
               <StatRow icon={<Activity className="w-3.5 h-3.5" />} label="Priority Level" value={segment.priority} />
             </div>
+
+            {segment.portfolioId && portfolios[segment.portfolioId] ? (
+              <div className="pt-4 border-t border-[var(--border)] space-y-3">
+                <h4 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-widest mb-3">Target Portfolio Details</h4>
+                <StatRow 
+                  icon={<Layers className="w-3.5 h-3.5" />} 
+                  label="Name" 
+                  value={portfolios[segment.portfolioId].name || 'Unnamed Portfolio'} 
+                />
+                <StatRow 
+                  icon={<Calendar className="w-3.5 h-3.5" />} 
+                  label="Allocation Month" 
+                  value={portfolios[segment.portfolioId].allocationMonth || 'N/A'} 
+                />
+                <StatRow 
+                  icon={<Activity className="w-3.5 h-3.5" />} 
+                  label="Source Type" 
+                  value={<span className="capitalize">{portfolios[segment.portfolioId].sourceType || 'N/A'}</span>} 
+                />
+                <StatRow 
+                  icon={<Users className="w-3.5 h-3.5" />} 
+                  label="Total Records" 
+                  value={(portfolios[segment.portfolioId].totalRecords || 0).toLocaleString()} 
+                />
+                <StatRow 
+                  icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />} 
+                  label="Status" 
+                  value={<span className="capitalize">{portfolios[segment.portfolioId].status || 'N/A'}</span>} 
+                />
+              </div>
+            ) : (
+              <div className="pt-4 border-t border-[var(--border)] space-y-3">
+                <StatRow 
+                  icon={<Layers className="w-3.5 h-3.5" />} 
+                  label="Target Portfolio" 
+                  value="Tenant-wide (All)" 
+                />
+              </div>
+            )}
 
             <div className="pt-4 border-t border-[var(--border)]">
               <button 

@@ -11,6 +11,7 @@ import { Target, Plus, Loader2, Users, AlertTriangle, CheckCircle2, BarChart3, R
 
 export default function SegmentsPage() {
   const [segments, setSegments] = useState<any[]>([]);
+  const [portfolios, setPortfolios] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [totalPortfolioRecords, setTotalPortfolioRecords] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -21,6 +22,17 @@ export default function SegmentsPage() {
     try {
       const segRes = await api.get('/segments');
       setSegments(segRes.data.data || []);
+
+      try {
+        const portRes = await api.get('/portfolios');
+        const portMap: Record<string, string> = {};
+        (portRes.data.data || []).forEach((p: any) => {
+          portMap[p.id] = p.name;
+        });
+        setPortfolios(portMap);
+      } catch (err) {
+        console.warn('Failed to load portfolios for mapping');
+      }
 
       try {
         const countRes = await api.get('/portfolio-records/count');
@@ -237,7 +249,11 @@ export default function SegmentsPage() {
                         {seg.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{seg.code} • Priority: {seg.priority}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                      {seg.code} • Priority: {seg.priority}
+                      {seg.portfolioId && portfolios[seg.portfolioId] && ` • Portfolio: ${portfolios[seg.portfolioId]}`}
+                      {!seg.portfolioId && ' • Tenant-wide'}
+                    </p>
                     {seg.description && (
                       <p className="text-xs text-[var(--text-secondary)] mt-2 line-clamp-1">{seg.description}</p>
                     )}

@@ -58,6 +58,7 @@ const palette = [
 
 export default function JourneyBuilderPage() {
   const [journeys, setJourneys] = useState<any[]>([]);
+  const [portfolios, setPortfolios] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [buildMode, setBuildMode] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
@@ -73,6 +74,17 @@ export default function JourneyBuilderPage() {
     try {
       const res = await api.get('/journeys');
       setJourneys(res.data.data || []);
+      
+      try {
+        const portRes = await api.get('/portfolios');
+        const portMap: Record<string, string> = {};
+        (portRes.data.data || []).forEach((p: any) => {
+          portMap[p.id] = p.name;
+        });
+        setPortfolios(portMap);
+      } catch (err) {
+        console.warn('Failed to load portfolios for mapping');
+      }
     } catch (err) { console.error('Failed to load journeys'); }
     finally { setIsLoading(false); }
   };
@@ -224,9 +236,17 @@ export default function JourneyBuilderPage() {
         throw new Error('Journey must start with a Segment Trigger and have a selected segment.');
       }
 
+      // Fetch segment to get its portfolioId
+      let portfolioId = null;
+      try {
+        const segRes = await api.get(`/segments/${startNode.data.segmentId}`);
+        portfolioId = segRes.data.data?.portfolioId || null;
+      } catch { /* ignore — legacy segments may not have portfolioId */ }
+
       const journeyData = {
         name: journeyName,
         segmentId: startNode.data.segmentId,
+        portfolioId,
         isActive: false, // Default to draft when saving
       };
 
@@ -479,6 +499,11 @@ export default function JourneyBuilderPage() {
                       {j.segment && (
                         <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full">
                           <Target className="w-3 h-3" /> {j.segment.name}
+                        </span>
+                      )}
+                      {j.portfolioId && portfolios[j.portfolioId] && (
+                        <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full">
+                           {portfolios[j.portfolioId]}
                         </span>
                       )}
                       <span className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-tertiary)]">

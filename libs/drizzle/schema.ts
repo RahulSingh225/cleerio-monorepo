@@ -57,6 +57,7 @@ export const tenants = pgTable(
     code: varchar('code', { length: 50 }).notNull().unique(),
     status: varchar('status', { length: 20 }).notNull().default('active'),
     settings: jsonb('settings').default({}),
+    autoSegmentOnUpload: boolean('auto_segment_on_upload').default(false),
     createdBy: uuid('created_by'), // → platform_users.id
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -220,6 +221,7 @@ export const segments = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id),
+    portfolioId: uuid('portfolio_id').references(() => portfolios.id),
     name: varchar('name', { length: 100 }).notNull(),
     code: varchar('code', { length: 50 }).notNull(),
     description: text('description'),
@@ -236,6 +238,7 @@ export const segments = pgTable(
     tenantIdIdx: index('segments_tenant_id_idx').on(t.tenantId),
     tenantActiveIdx: index('segments_tenant_active_priority_idx').on(t.tenantId, t.isActive, t.priority),
     tenantDefaultIdx: index('segments_tenant_default_idx').on(t.tenantId, t.isDefault),
+    tenantPortfolioIdx: index('segments_tenant_portfolio_idx').on(t.tenantId, t.portfolioId),
   })
 );
 
@@ -361,6 +364,7 @@ export const journeys = pgTable(
     segmentId: uuid('segment_id')
       .notNull()
       .references(() => segments.id),
+    portfolioId: uuid('portfolio_id').references(() => portfolios.id),
     name: varchar('name', { length: 100 }).notNull(),
     description: text('description'),
     isActive: boolean('is_active').default(true),
@@ -371,6 +375,7 @@ export const journeys = pgTable(
   },
   (t) => ({
     tenantSegmentIdx: index('journeys_tenant_segment_idx').on(t.tenantId, t.segmentId),
+    tenantPortfolioIdx: index('journeys_tenant_portfolio_idx').on(t.tenantId, t.portfolioId),
   })
 );
 

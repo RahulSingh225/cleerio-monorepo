@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db, journeys, journeySteps, commEvents, portfolioRecords } from '@platform/drizzle';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, or, isNull } from 'drizzle-orm';
 import { ReassignmentRulesService } from '../segments/reassignment-rules.service';
 @Injectable()
 export class JourneyProgressionService {
@@ -11,16 +11,30 @@ export class JourneyProgressionService {
   /**
    * Admits a record to a journey.
    * Prevents re-entry if an active event already exists for this record in this journey.
+   * Now portfolio-scoped: only matches journeys targeting the record's portfolio.
    */
   async admitToJourney(tenantId: string, recordId: string, segmentId: string) {
-    // 1. Find the active journey for this segment
+    // 0. Fetch the record to get its portfolioId
+    const [record] = await db
+      .select({ portfolioId: portfolioRecords.portfolioId })
+      .from(portfolioRecords)
+      .where(eq(portfolioRecords.id, recordId))
+      .limit(1);
+
+    const portfolioId = record?.portfolioId;
+
+    // 1. Find the active journey for this segment + portfolio
     const [journey] = await db
       .select()
       .from(journeys)
       .where(and(
         eq(journeys.tenantId, tenantId),
         eq(journeys.segmentId, segmentId),
-        eq(journeys.isActive, true)
+        eq(journeys.isActive, true),
+        // Match portfolio-scoped journey OR legacy tenant-wide journey (null portfolioId)
+        portfolioId
+          ? or(eq(journeys.portfolioId, portfolioId), isNull(journeys.portfolioId))
+          : isNull(journeys.portfolioId),
       ))
       .limit(1);
 

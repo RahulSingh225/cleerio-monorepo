@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { SegmentsService } from './segments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantRoleGuard } from '../auth/guards/tenant-role.guard';
@@ -24,22 +24,22 @@ export class SegmentsController {
 
   @Post('run')
   @Roles('tenant_admin', 'ops')
-  async runSegmentation() {
+  async runSegmentation(@Body() body: { portfolioId?: string }) {
     const tenantId = TenantContext.tenantId;
     await db.insert(taskQueue).values({
       tenantId,
       jobType: 'segmentation.run',
       status: 'pending',
-      payload: { tenantId },
+      payload: { tenantId, portfolioId: body?.portfolioId },
       priority: 1,
       runAfter: new Date(),
     });
-    return { data: { status: 'queued', message: 'Segmentation run has been queued.' } };
+    return { data: { status: 'queued', message: 'Segmentation run has been queued.', portfolioId: body?.portfolioId || 'all' } };
   }
 
   @Get()
-  async findAll() {
-    const data = await this.segmentsService.findAllWithCounts();
+  async findAll(@Query('portfolioId') portfolioId?: string) {
+    const data = await this.segmentsService.findAllWithCounts(portfolioId);
     return { data };
   }
 
